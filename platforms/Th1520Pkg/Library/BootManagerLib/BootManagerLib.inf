@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = BootManagerLib
+  FILE_GUID = d25a43ad-3e3b-4ccb-a6a9-bcc28c8a6d79
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = PlatformBootManagerLib
+
+[Sources]
+  BootManager.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  UefiCpuPkg/UefiCpuPkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  OvmfPkg/OvmfPkg.dec
+
+[LibraryClasses]
+  BootLogoLib
+  BaseMemoryLib
+  DevicePathLib
+  MemoryAllocationLib
+  PcdLib
+  PrintLib
+  SerialPortLib
+  UefiBootManagerLib
+  UefiBootServicesTableLib
+  UefiLib
+
+[Guids]
+  gEdkiiPlatformHasDeviceTreeGuid
+  gEfiEndOfDxeEventGroupGuid
+  gEfiGlobalVariableGuid
+  gEfiEventReadyToBootGuid
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
+  gEfiLoadedImageProtocolGuid
+  gFdtClientProtocolGuid
+
+[Pcd]
+  gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut
