@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = MelesBoardLib
+  FILE_GUID = e8f5803d-8014-489e-b906-0441b4a97464
+  MODULE_TYPE = BASE
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = Th1520BoardLib
+[Sources]
+  Board.c
+[Packages]
+  MdePkg/MdePkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  IoLib
+  TimerLib
+  Th1520BoardSupportLib
