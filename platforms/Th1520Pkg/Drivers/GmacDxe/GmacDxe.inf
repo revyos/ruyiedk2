@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = MelesGmacDxe
+  FILE_GUID = bb310e21-cc34-4fce-bf71-cb1028c8f404
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = GmacInitialize
+[Sources]
+  Gmac.c
+  Gmac.h
+  Fdt.c
+  Phy.c
+  Address.c
+[Packages]
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  CryptoPkg/CryptoPkg.dec
+[LibraryClasses]
+  FdtLib
+  HobLib
+  BaseLib
+  BaseMemoryLib
+  BaseCryptLib
+  CacheMaintenanceLib
+  DebugLib
+  IoLib
+  MemoryAllocationLib
+  RngLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
+[Protocols]
+  gEfiSimpleNetworkProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gFdtClientProtocolGuid
+  gEfiCpuArchProtocolGuid
+[Guids]
+  gFdtHobGuid
+  gEfiEventExitBootServicesGuid
+[Depex]
+  gFdtClientProtocolGuid AND gEfiCpuArchProtocolGuid
