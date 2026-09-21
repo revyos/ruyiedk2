@@ -9,6 +9,7 @@ Sipeed Lichee Pi 4A。
 - `tests/`：EDK2 驱动的主机测试及 HSM、I/O EFI 测试应用。
 - `tools/build.sh`、`Makefile`：EDK2 构建和测试入口。
 - `docs/display.md`：HDMI 实现及已有硬件验证记录。
+- `docs/device-tree.md`：固件解析设备树的范围和板级边界。
 - `docs/recovery.md`：RAM 恢复配置及原始固件刷写目标。
 - `docs/io-performance.md`：SPI、eMMC、USB 和网卡测速及复现方式。
 
@@ -49,12 +50,12 @@ make check
 make edk2-hsm-test EDK2_BOARD=lpi4a
 ```
 
-`make check` 检查显示、DMA、复位、MAC 地址及两块板的 USB 供电。
+`make check` 检查显示、DMA、复位、MAC 地址和存储驱动。
 HSM 测试产物在
 `build/Build/Lpi4a/RELEASE_GCC/RISCV64/HsmTest.efi`，
 需在目标板 UEFI Shell 运行，不包含在默认固件中。
 
-需要验证 Fastboot 镜像校验和设备树解析时，使用上层已构建的
+需要验证 Fastboot 镜像校验、设备树解析和 USB 供电时，使用已构建的
 两块板的镜像与 DTB；这些检查不会构建或修改外部固件：
 
 ```sh

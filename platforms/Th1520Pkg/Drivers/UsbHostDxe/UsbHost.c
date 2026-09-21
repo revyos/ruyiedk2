@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 // TH1520 DWC3 host with board-specific USB routing and power control.
-#include <Uefi.h>
+#include <PiDxe.h>
+#include <Guid/FdtHob.h>
+#include <Library/HobLib.h>
+#include <Library/Th1520BoardSupportLib.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
@@ -15,7 +18,7 @@
 #include <Protocol/Th1520UsbRole.h>
 #include <Protocol/PciIo.h>
 
-#define USB 0xffe7040000ULL
+STATIC UINTN USB;
 STATIC EFI_HANDLE Host;
 STATIC BOOLEAN DeviceMode;
 STATIC TH1520_USB_ROLE_PROTOCOL Role;
@@ -162,6 +165,16 @@ EFI_STATUS EFIAPI
 UsbHostInitialize (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
   EFI_STATUS Status;
+  VOID *Hob = GetFirstGuidHob (&gFdtHobGuid);
+  if (!Hob || GET_GUID_HOB_DATA_SIZE (Hob) != sizeof (UINT64))
+    return EFI_NOT_FOUND;
+  CONST VOID *Fdt = (VOID *)(UINTN)
+      *(UINT64 *)GET_GUID_HOB_DATA (Hob);
+  Status = Th1520FdtUsbHostInit (Fdt, &USB);
+  if (EFI_ERROR (Status))
+    return Status;
+  // Allow the hub rail to settle before routing and controller reset.
+  MicroSecondDelay (10000);
   Status = UsbDmaInitialize ();
   if (EFI_ERROR (Status))
   {

@@ -52,7 +52,8 @@ edk2-hsm-test: basetools
 
 .PHONY: check check-artifacts
 check: edk2-display-check edk2-usb-check edk2-reset-check
-check: edk2-gmac-address-check edk2-meles-usb-check edk2-lpi4a-usb-check
+check: edk2-gmac-address-check
+check-artifacts: edk2-meles-usb-check edk2-lpi4a-usb-check
 check: edk2-recovery-check
 check-artifacts: edk2-check edk2-gmac-check
 	python3 tests/edk2-usb-dt.py $(IMAGE_BUILD)/$(EDK2_BOARD).dtb \
@@ -119,6 +120,8 @@ edk2-gmac-address-check:
 
 BOARD_LIB = platforms/Th1520Pkg/Library/BoardSupportLib
 FDT_SOURCES = $(BOARD_LIB)/Fdt.c $(BOARD_LIB)/Pinctrl.c
+BOARD_SOURCES = $(FDT_SOURCES) $(BOARD_LIB)/Resources.c \
+  $(BOARD_LIB)/BoardSupport.c
 FDT_TEST_FLAGS = -g -fsanitize=address,undefined -fshort-wchar \
   -ffunction-sections -fdata-sections -Wl,--gc-sections \
   -I$(EDK2_SOURCE)/MdePkg/Include \
@@ -126,36 +129,26 @@ FDT_TEST_FLAGS = -g -fsanitize=address,undefined -fshort-wchar \
   -I$(EDK2_SOURCE)/EmbeddedPkg/Include \
   -Iplatforms/Th1520Pkg/Include
 
-.PHONY: edk2-meles-usb-check
+.PHONY: edk2-meles-usb-check edk2-lpi4a-usb-check
 edk2-meles-usb-check:
 	mkdir -p $(EDK2_BUILD)
-	$(CC) -g -fsanitize=address,undefined -ffunction-sections \
-		-fdata-sections \
-		-Wl,--gc-sections -fshort-wchar \
-		-I$(EDK2_SOURCE)/MdePkg/Include \
-		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
-		-Iplatforms/Th1520Pkg/Include \
+	$(CC) $(FDT_TEST_FLAGS) -Wl,--wrap=Th1520Pca9557Output \
 		tests/edk2-usb-power.c \
+		tests/edk2-fdt-host.c $(BOARD_SOURCES) \
 		platforms/MelesPkg/Library/BoardLib/Board.c \
-		platforms/Th1520Pkg/Library/BoardSupportLib/BoardSupport.c \
-		-o $(EDK2_BUILD)/test-meles-usb-power
-	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-meles-usb-power
+		-lfdt -o $(EDK2_BUILD)/test-meles-usb-power
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-meles-usb-power \
+		$(FIRMWARE_BUILD)/edk2/meles.dtb
 
-.PHONY: edk2-lpi4a-usb-check
 edk2-lpi4a-usb-check:
 	mkdir -p $(EDK2_BUILD)
-	$(CC) -g -fsanitize=address,undefined -ffunction-sections \
-		-fdata-sections \
-		-Wl,--gc-sections -Wl,--wrap=Th1520Pca9557Output \
-		-DTEST_LPI4A -fshort-wchar \
-		-I$(EDK2_SOURCE)/MdePkg/Include \
-		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
-		-Iplatforms/Th1520Pkg/Include \
-		tests/edk2-usb-power.c \
+	$(CC) $(FDT_TEST_FLAGS) -Wl,--wrap=Th1520Pca9557Output \
+		-DTEST_LPI4A tests/edk2-usb-power.c \
+		tests/edk2-fdt-host.c $(BOARD_SOURCES) \
 		platforms/Lpi4aPkg/Library/BoardLib/Board.c \
-		platforms/Th1520Pkg/Library/BoardSupportLib/BoardSupport.c \
-		-o $(EDK2_BUILD)/test-lpi4a-usb-power
-	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-lpi4a-usb-power
+		-lfdt -o $(EDK2_BUILD)/test-lpi4a-usb-power
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-lpi4a-usb-power \
+		$(FIRMWARE_BUILD)/edk2-lpi4a/lpi4a.dtb
 
 .PHONY: edk2-check
 edk2-check:

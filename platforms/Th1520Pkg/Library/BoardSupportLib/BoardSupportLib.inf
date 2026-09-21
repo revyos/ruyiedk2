@@ -10,6 +10,7 @@
   BoardSupport.c
   Fdt.c
   Pinctrl.c
+  Resources.c
   BoardFdt.h
 [Packages]
   EmbeddedPkg/EmbeddedPkg.dec

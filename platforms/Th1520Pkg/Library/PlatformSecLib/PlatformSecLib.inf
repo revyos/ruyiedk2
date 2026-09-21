@@ -24,7 +24,7 @@
   SecEntry.S
 
 [LibraryClasses]
-  Th1520BoardLib
+  Th1520BoardSupportLib
   IoLib
   BaseLib
   BaseMemoryLib

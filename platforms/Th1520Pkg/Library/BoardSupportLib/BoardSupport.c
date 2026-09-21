@@ -9,9 +9,11 @@ VOID
 Th1520Pad (UINTN Base, UINTN Pin, UINT32 Mux, UINT32 Config)
 {
   UINTN Shift = 4 * (Pin % 8);
-  MmioAndThenOr32 (Base + 0x400 + 4 * (Pin / 8), ~(15U << Shift), Mux << Shift);
+  MmioAndThenOr32 (Base + 0x400 + 4 * (Pin / 8),
+                   ~(15U << Shift), Mux << Shift);
   Shift = 16 * (Pin % 2);
-  MmioAndThenOr32 (Base + 4 * (Pin / 2), ~(0x3ffU << Shift), Config << Shift);
+  MmioAndThenOr32 (Base + 4 * (Pin / 2),
+                   ~(0x3ffU << Shift), Config << Shift);
 }
 
 VOID
@@ -20,19 +22,6 @@ Th1520GpioOutput (UINTN Base, UINTN Pin, BOOLEAN High)
   MmioAndThenOr32 (Base, ~(1U << Pin), High ? 1U << Pin : 0);
   MmioOr32 (Base + 4, 1U << Pin);
   MemoryFence ();
-}
-
-VOID
-Th1520Fan (UINTN Pin, UINTN Mux, UINTN Channel)
-{
-  UINTN Pwm = 0xffec01c000ULL + Channel * 0x20;
-  MmioOr32 (0xffef010204ULL, BIT22 | BIT18);
-  Th1520Pad (0xffec007000ULL, Pin, Mux, 15);
-  MmioWrite32 (Pwm, 0x120);
-  MmioWrite32 (Pwm + 8, 1000000);
-  MmioWrite32 (Pwm + 12, 1000000);
-  MmioWrite32 (Pwm, 0x124);
-  MmioWrite32 (Pwm, 0x121);
 }
 
 STATIC EFI_STATUS
@@ -91,7 +80,8 @@ Th1520Pca9557Output (UINTN I2c, UINT8 Address, UINT8 Mask, UINT8 Value)
   {
     return EFI_TIMEOUT;
   }
-  MmioWrite32 (I2c, 0x63); // Master, standard speed, restart, no slave mode.
+  // Master, standard speed, restart, no slave mode.
+  MmioWrite32 (I2c, 0x63);
   MmioWrite32 (I2c + 4, Address);
   // Conservative timing for the TH1520 APB clock; setup runs only at boot.
   MmioWrite32 (I2c + 0x14, 2500);

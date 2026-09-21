@@ -32,6 +32,38 @@ GpioMux (UINT32 Group, UINTN Pin)
   return -1;
 }
 
+EFI_STATUS
+GpioPad (CONST VOID *Fdt, INT32 Port, UINT32 Pin, UINTN *Base, UINTN *Pad,
+         UINT32 *Mux, INT32 *PadNode)
+{
+  CONST UINT32 *Ranges;
+  INT32 Length, Controller, Function;
+  UINT32 First, Start, Count, Group;
+  Ranges = FdtGetProp (Fdt, Port, "gpio-ranges", &Length);
+  if (!Ranges || Length <= 0 || Length % 16)
+    return EFI_UNSUPPORTED;
+  for (INT32 I = 0; I < Length / 4; I += 4)
+  {
+    First = Cell (&Ranges[I + 1]);
+    Start = Cell (&Ranges[I + 2]);
+    Count = Cell (&Ranges[I + 3]);
+    if (Pin < First || Pin - First >= Count ||
+        Start > MAX_UINT32 - (Pin - First))
+      continue;
+    Controller = FdtNodeOffsetByPhandle (Fdt, Cell (&Ranges[I]));
+    if (EFI_ERROR (PadController (Fdt, Controller, Base, &Group)))
+      return EFI_UNSUPPORTED;
+    *Pad = Start + Pin - First;
+    Function = GpioMux (Group, *Pad);
+    if (Function < 0)
+      return EFI_UNSUPPORTED;
+    *Mux = (UINT32)Function;
+    *PadNode = Controller;
+    return EFI_SUCCESS;
+  }
+  return EFI_NOT_FOUND;
+}
+
 STATIC INTN
 PinNumber (CONST CHAR8 *Name, UINT32 Group)
 {

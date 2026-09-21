@@ -18,6 +18,15 @@ Th1520FdtEnabled (CONST VOID *Fdt, INT32 Node)
   return TRUE;
 }
 
+INT32
+FindEnabled (CONST VOID *Fdt, INT32 After, CONST CHAR8 *Name)
+{
+  while ((After = FdtNodeOffsetByCompatible (Fdt, After, Name)) >= 0)
+    if (Th1520FdtEnabled (Fdt, After))
+      break;
+  return After;
+}
+
 EFI_STATUS
 ReadCell (CONST VOID *Fdt, INT32 Node, CONST CHAR8 *Name, UINT32 *Value)
 {
@@ -127,4 +136,52 @@ EnableClock (CONST VOID *Fdt, INT32 Node, BOOLEAN Apply)
       return EFI_SUCCESS;
     }
   return EFI_UNSUPPORTED;
+}
+
+EFI_STATUS
+PwmClockRate (CONST VOID *Fdt, INT32 Node, UINT32 *Rate)
+{
+  INT32 Provider, Osc;
+  CONST UINT32 *Clock;
+  INT32 Bytes;
+  UINT32 Id, Ref, Pll, Cfg, Ahb, Apb, Div;
+  UINT64 Value;
+  UINTN Base;
+  EFI_STATUS Status = ApClock (Fdt, Node, &Provider, &Id, &Base);
+  if (EFI_ERROR (Status) || Id != 51)
+    return EFI_UNSUPPORTED;
+  Clock = FdtGetProp (Fdt, Provider, "clocks", &Bytes);
+  if (!Clock || Bytes != 4)
+    return EFI_UNSUPPORTED;
+  Osc = FdtNodeOffsetByPhandle (Fdt, Cell (Clock));
+  if (!Th1520FdtEnabled (Fdt, Osc) ||
+      !Compatible (Fdt, Osc, "fixed-clock") ||
+      EFI_ERROR (ReadCell (Fdt, Osc, "clock-frequency", &Ref)) || !Ref)
+    return EFI_UNSUPPORTED;
+  Ahb = MmioRead32 (Base + 0x140);
+  Apb = (MmioRead32 (Base + 0x150) & 7) + 1;
+  Div = Ahb & 15;
+  if (!Div)
+    return EFI_DEVICE_ERROR;
+  Value = Ref;
+  if (!(Ahb & BIT5))
+  {
+    Pll = MmioRead32 (Base + 0x20);
+    Cfg = MmioRead32 (Base + 0x24);
+    if (!(Cfg & BIT30))
+    {
+      UINT32 PllDiv = (Pll & 63) * ((Pll >> 20) & 7) * ((Pll >> 24) & 7);
+      Value = MultU64x32 (Ref, (Pll >> 8) & 4095);
+      if (!PllDiv)
+        return EFI_DEVICE_ERROR;
+      if (!(Cfg & BIT24))
+        Value += RShiftU64 (MultU64x32 (Ref, Cfg & 0xffffff), 24);
+      Value = DivU64x32 (Value, PllDiv);
+    }
+  }
+  Value = DivU64x32 (Value, Div * Apb);
+  if (!Value || Value > MAX_UINT32)
+    return EFI_DEVICE_ERROR;
+  *Rate = (UINT32)Value;
+  return EFI_SUCCESS;
 }

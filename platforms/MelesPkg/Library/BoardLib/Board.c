@@ -5,20 +5,6 @@
 #include <Library/Th1520BoardLib.h>
 #include <Library/Th1520BoardSupportLib.h>
 
-VOID EFIAPI
-Th1520BoardEarlyInit (VOID)
-{
-  Th1520Fan (4, 1, 2);
-
-  // USB-A VBUS is separate from the GL3523's fixed 3.3 V / 1.2 V rails.
-  // Establish its active level before connecting the pad, then leave it
-  // powered through host/device switches and the handoff to Linux.
-  MmioOr32 (0xffef010204ULL, BIT8 | BIT24);
-  Th1520GpioOutput (0xffec005000ULL, 27, TRUE);
-  Th1520Pad (0xffe7f3c000ULL, 27, 0, 4); // 7 mA, matching the board DT.
-  MicroSecondDelay (1000);
-}
-
 EFI_STATUS EFIAPI
 Th1520BoardUsbRole (BOOLEAN Device)
 {

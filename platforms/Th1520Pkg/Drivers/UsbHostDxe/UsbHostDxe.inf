@@ -11,10 +11,13 @@
   Dma.c
   Dma.h
 [Packages]
+  EmbeddedPkg/EmbeddedPkg.dec
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
   Th1520Pkg/Th1520Pkg.dec
 [LibraryClasses]
+  HobLib
+  Th1520BoardSupportLib
   Th1520BoardLib
   BaseLib
   BaseMemoryLib
@@ -27,6 +30,8 @@
   UefiBootServicesTableLib
   UefiDriverEntryPoint
   UefiLib
+[Guids]
+  gFdtHobGuid
 [Protocols]
   gEfiPciIoProtocolGuid
   gTh1520UsbRoleProtocolGuid

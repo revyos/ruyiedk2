@@ -8,7 +8,7 @@
 
 #include "PlatformSecLib.h"
 #include <Library/IoLib.h>
-#include <Library/Th1520BoardLib.h>
+#include <Library/Th1520BoardSupportLib.h>
 
 /**
   Build memory map I/O range resource HOB using the
@@ -116,8 +116,10 @@ PlatformInitialization (
 
   *FdtHobData = (UINTN)NewBase;
 
-  // Board reset delays use TimerLib, which obtains timebase from the FDT HOB.
-  Th1520BoardEarlyInit ();
+  // TimerLib needs the FDT HOB before GPIO supply delays can run.
+  EFI_STATUS Status = Th1520FdtEarlyInit (NewBase);
+  if (EFI_ERROR (Status))
+    DEBUG ((DEBUG_ERROR, "TH1520 board resources: %r\n", Status));
 
   PopulateIoResources (Base, "snps,dw-apb-uart");
   BuildMemoryAllocationHob (PcdGet32 (PcdOvmfDxeMemFvBase), SIZE_4MB, EfiBootServicesData);

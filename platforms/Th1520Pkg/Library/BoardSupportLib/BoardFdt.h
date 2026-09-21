@@ -28,9 +28,16 @@ EFI_STATUS Th1520FdtReg (
     CONST VOID *Fdt, INT32 Node, UINTN *Base, UINTN *Size);
 EFI_STATUS
 ReadCell (CONST VOID *Fdt, INT32 Node, CONST CHAR8 *Name, UINT32 *Value);
+INT32
+FindEnabled (CONST VOID *Fdt, INT32 After, CONST CHAR8 *Name);
 EFI_STATUS
 EnableClock (CONST VOID *Fdt, INT32 Node, BOOLEAN Apply);
 EFI_STATUS
+PwmClockRate (CONST VOID *Fdt, INT32 Node, UINT32 *Rate);
+EFI_STATUS
 PinState (CONST VOID *Fdt, INT32 Node, BOOLEAN Apply);
+EFI_STATUS
+GpioPad (CONST VOID *Fdt, INT32 Port, UINT32 Pin, UINTN *Base, UINTN *Pad,
+         UINT32 *Mux, INT32 *PadNode);
 EFI_STATUS
 PadController (CONST VOID *Fdt, INT32 Node, UINTN *Base, UINT32 *Group);
