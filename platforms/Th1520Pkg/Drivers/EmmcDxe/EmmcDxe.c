@@ -16,7 +16,8 @@
 #include <Library/PcdLib.h>
 #include <Library/UefiLib.h>
 #include <Protocol/DevicePath.h>
-#define MMC 0xffe7080000ULL
+STATIC UINTN MMC;
+STATIC UINT32 BusWidth, RateLimit;
 STATIC EFI_BLOCK_IO_MEDIA Media;
 STATIC UINT32 ClockRate;
 STATIC UINT8 PartitionConfig;
@@ -28,50 +29,76 @@ STATIC EMMC_ADMA_DESCRIPTOR *DmaTable;
 STATIC BOOLEAN DmaEnabled;
 STATIC UINT32 BusRate;
 
-STATIC UINT32
-MaximumRate (VOID)
+STATIC EFI_STATUS
+ParseHardware (VOID)
 {
   FDT_CLIENT_PROTOCOL *Fdt;
   CONST VOID *Value;
-  UINT32 Size, Limit;
+  UINT32 Size;
   INT32 Node = -1;
-  UINTN Index;
+  EFI_STATUS Status;
   STATIC CONST CHAR8 *HighSpeed[] = {
-      "cap-mmc-highspeed", "mmc-ddr-1_8v",
-      "mmc-hs200-1_8v", "mmc-hs400-1_8v"
+    "cap-mmc-highspeed", "mmc-ddr-1_8v",
+    "mmc-hs200-1_8v", "mmc-hs400-1_8v"
   };
-  if (EFI_ERROR (gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL,
-                                      (VOID **)&Fdt)))
-  {
-    return 25000000;
-  }
+  Status = gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL,
+                                (VOID **)&Fdt);
+  if (EFI_ERROR (Status))
+    return Status;
   while (!EFI_ERROR (Fdt->FindNextCompatibleNode (
       Fdt, "thead,th1520-dwcmshc", Node, &Node)))
   {
-    if (EFI_ERROR (Fdt->GetNodeProperty (Fdt, Node, "reg", &Value,
-                                        &Size)) || Size != 16 ||
-        SwapBytes64 (ReadUnaligned64 (Value)) != MMC)
-    {
+    Status = Fdt->GetNodeProperty (Fdt, Node, "status", &Value, &Size);
+    if (!EFI_ERROR (Status) &&
+        !((Size == 5 && !CompareMem (Value, "okay", 5)) ||
+          (Size == 3 && !CompareMem (Value, "ok", 3))))
       continue;
-    }
-    // HS200/HS400 board descriptions also permit the HS52 transition.
-    for (Index = 0; Index < ARRAY_SIZE (HighSpeed); Index++)
+    // Removable SD slots have a different command and voltage sequence.
+    if (EFI_ERROR (Fdt->GetNodeProperty (
+        Fdt, Node, "non-removable", &Value, &Size)))
+      continue;
+    Status = Fdt->GetNodeProperty (Fdt, Node, "reg", &Value, &Size);
+    if (EFI_ERROR (Status) || Size != 16)
+      return EFI_COMPROMISED_DATA;
+    MMC = SwapBytes64 (ReadUnaligned64 (Value));
+    if (MMC != 0xffe7080000ULL ||
+        SwapBytes64 (ReadUnaligned64 ((UINT8 *)Value + 8)) < 0x530)
+      return EFI_UNSUPPORTED;
+    BusWidth = 1;
+    Status = Fdt->GetNodeProperty (Fdt, Node, "bus-width", &Value, &Size);
+    if (!EFI_ERROR (Status))
     {
+      if (Size != 4)
+        return EFI_COMPROMISED_DATA;
+      BusWidth = SwapBytes32 (ReadUnaligned32 (Value));
+    }
+    if (BusWidth != 1 && BusWidth != 4 && BusWidth != 8)
+      return EFI_UNSUPPORTED;
+    if (!EFI_ERROR (Fdt->GetNodeProperty (
+        Fdt, Node, "no-1-8-v", &Value, &Size)))
+      return EFI_UNSUPPORTED;
+    RateLimit = 25000000;
+    for (UINTN I = 0; I < ARRAY_SIZE (HighSpeed); I++)
       if (!EFI_ERROR (Fdt->GetNodeProperty (
-          Fdt, Node, HighSpeed[Index], &Value, &Size)))
+          Fdt, Node, HighSpeed[I], &Value, &Size)))
       {
+        // HS200/HS400 descriptions also allow the HS52 transition.
+        RateLimit = 52000000;
         break;
       }
-    }
-    Limit = Index == ARRAY_SIZE (HighSpeed) ? 25000000 : 52000000;
-    if (!EFI_ERROR (Fdt->GetNodeProperty (Fdt, Node, "max-frequency",
-                                         &Value, &Size)) && Size == 4)
+    Status = Fdt->GetNodeProperty (Fdt, Node, "max-frequency",
+                                  &Value, &Size);
+    if (!EFI_ERROR (Status))
     {
-      return MIN (Limit, SwapBytes32 (ReadUnaligned32 (Value)));
+      if (Size != 4)
+        return EFI_COMPROMISED_DATA;
+      RateLimit = MIN (RateLimit, SwapBytes32 (ReadUnaligned32 (Value)));
+      if (RateLimit < 400000)
+        return EFI_UNSUPPORTED;
     }
-    return Limit;
+    return EFI_SUCCESS;
   }
-  return 25000000;
+  return EFI_NOT_FOUND;
 }
 
 STATIC EFI_STATUS
@@ -397,13 +424,16 @@ Initialize (VOID)
   {
     return Status;
   }
-  Status = Command (6, 0x03b70200, 0x1b, NULL, 0, FALSE);
+  Status = Command (6, 0x03b70000 |
+      ((BusWidth == 8 ? 2U : BusWidth == 4 ? 1U : 0U) << 8),
+      0x1b, NULL, 0, FALSE);
   if (EFI_ERROR (Status))
   {
     return Status;
   }
-  MmioWrite8 (MMC + 0x28, BIT5);
-  Div = MaximumRate ();
+  MmioWrite8 (MMC + 0x28,
+                 BusWidth == 8 ? BIT5 : BusWidth == 4 ? BIT1 : 0);
+  Div = RateLimit;
   if (Div > 25000000 && (Ext[196] & 3))
   {
     Div = MIN (Div, (Ext[196] & BIT1) ? 52000000 : 26000000);
@@ -439,7 +469,8 @@ Initialize (VOID)
   Media.BlockSize = 512;
   Media.IoAlign = 1;
   UserAreaSelected = TRUE;
-  Print (L"TH1520 eMMC: %u kHz, 8-bit %s\n", BusRate / 1000,
+  Print (L"TH1520 eMMC: %u kHz, %u-bit %s\n", BusRate / 1000,
+         BusWidth,
          DmaEnabled ? L"ADMA2" : L"PIO");
   return EFI_SUCCESS;
 }
@@ -658,6 +689,9 @@ EmmcInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
   EFI_STATUS Status;
   EFI_HANDLE Handle = NULL;
   EFI_PHYSICAL_ADDRESS Address = MAX_UINT32;
+  Status = ParseHardware ();
+  if (EFI_ERROR (Status))
+    return Status;
   // 32-bit ADMA works independently of SDHCI v4/64-bit mode selection.
   Status = gBS->AllocatePages (AllocateMaxAddress, EfiBootServicesData,
       EFI_SIZE_TO_PAGES (EMMC_DMA_SIZE) + 1, &Address);
