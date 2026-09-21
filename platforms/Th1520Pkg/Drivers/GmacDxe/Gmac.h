@@ -47,7 +47,8 @@ typedef struct
 #define TX_CHAIN BIT20
 #define TX_FIRST BIT28
 #define TX_LAST BIT29
-#define RX_COUNT 16
+#define RX_COUNT 64
+#define TX_COUNT 8
 #define BUFFER_SIZE 2048
 #define MAX_FRAME 1518
 

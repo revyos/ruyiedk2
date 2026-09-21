@@ -212,6 +212,18 @@ edk2-usb-register-check:
 		-o $(EDK2_BUILD)/test-usb-registers
 	$(EDK2_BUILD)/test-usb-registers
 
+.PHONY: edk2-gmac-queue-check
+check: edk2-gmac-queue-check
+edk2-gmac-queue-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=undefined -ffunction-sections \
+		-fdata-sections -Wl,--gc-sections -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include tests/edk2-gmac-queue.c \
+		-o $(EDK2_BUILD)/test-gmac-queue
+	$(EDK2_BUILD)/test-gmac-queue
+
 .PHONY: edk2-emmc-fdt-check
 check: edk2-emmc-fdt-check
 edk2-emmc-fdt-check:

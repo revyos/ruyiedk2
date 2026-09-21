@@ -20,9 +20,9 @@ STATIC_ASSERT (sizeof (GMAC_DESCRIPTOR) == 64, "One descriptor per C910 cache li
 typedef struct
 {
   GMAC_DESCRIPTOR Rx[RX_COUNT];
-  GMAC_DESCRIPTOR Tx;
+  GMAC_DESCRIPTOR Tx[TX_COUNT];
   UINT8 RxBuffer[RX_COUNT][BUFFER_SIZE];
-  UINT8 TxBuffer[BUFFER_SIZE];
+  UINT8 TxBuffer[TX_COUNT][BUFFER_SIZE];
 } GMAC_DMA;
 #pragma pack(1)
 typedef struct
@@ -43,7 +43,8 @@ typedef struct
   EFI_EVENT PollEvent, ExitEvent;
   GMAC_DMA *Dma;
   UINTN RxIndex, Speed;
-  VOID *TxCookie;
+  VOID *TxCookie[TX_COUNT];
+  UINTN TxHead, TxTail, TxPending;
   BOOLEAN TxComplete, Duplex, Exited;
   UINT64 NextLinkCheck, CounterFrequency;
 } GMAC_DEVICE;
@@ -276,13 +277,19 @@ InitializeHardware (GMAC_DEVICE *Nic)
   {
     RearmRx (Nic, Index);
   }
-  Nic->Dma->Tx.Status = TX_CHAIN;
-  Nic->Dma->Tx.Buffer = (UINT32)(UINTN)Nic->Dma->TxBuffer;
-  Nic->Dma->Tx.Next = (UINT32)(UINTN)&Nic->Dma->Tx;
-  WriteBackInvalidateDataCacheRange (&Nic->Dma->Tx, sizeof (Nic->Dma->Tx));
+  for (Index = 0; Index < TX_COUNT; Index++)
+  {
+    Nic->Dma->Tx[Index].Status = TX_CHAIN;
+    Nic->Dma->Tx[Index].Buffer = (UINT32)(UINTN)Nic->Dma->TxBuffer[Index];
+    Nic->Dma->Tx[Index].Next =
+        (UINT32)(UINTN)&Nic->Dma->Tx[(Index + 1) % TX_COUNT];
+  }
+  WriteBackInvalidateDataCacheRange (Nic->Dma->Tx, sizeof (Nic->Dma->Tx));
   GmacWrite (&Nic->Hardware, DMA_BUS_MODE, BIT16 | (8 << 8));
   GmacWrite (&Nic->Hardware, DMA_RX_BASE, (UINT32)(UINTN)&Nic->Dma->Rx[0]);
-  GmacWrite (&Nic->Hardware, DMA_TX_BASE, (UINT32)(UINTN)&Nic->Dma->Tx);
+  // Reset retains caller cookies; hardware starts at the next free slot.
+  GmacWrite (&Nic->Hardware, DMA_TX_BASE,
+             (UINT32)(UINTN)&Nic->Dma->Tx[Nic->TxHead]);
   GmacWrite (&Nic->Hardware, DMA_INTERRUPT_ENABLE, 0);
   GmacWrite (&Nic->Hardware, MAC_INTERRUPT_MASK, MAX_UINT32);
   GmacWrite (&Nic->Hardware, DMA_STATUS, MAX_UINT32);
@@ -305,12 +312,13 @@ RxReady (GMAC_DEVICE *Nic)
 STATIC VOID
 CheckTx (GMAC_DEVICE *Nic)
 {
-  if (!Nic->TxCookie || Nic->TxComplete)
+  if (!Nic->TxPending || Nic->TxComplete)
   {
     return;
   }
-  InvalidateDataCacheRange (&Nic->Dma->Tx, sizeof (Nic->Dma->Tx));
-  if (Nic->Dma->Tx.Status & DESC_OWN)
+  InvalidateDataCacheRange (&Nic->Dma->Tx[Nic->TxTail],
+                            sizeof (Nic->Dma->Tx[0]));
+  if (Nic->Dma->Tx[Nic->TxTail].Status & DESC_OWN)
   {
     return;
   }
@@ -415,7 +423,9 @@ Initialize (EFI_SIMPLE_NETWORK_PROTOCOL *This, UINTN ExtraRx, UINTN ExtraTx)
   }
   else
   {
-    Nic->TxCookie = NULL;
+    ZeroMem (Nic->TxCookie, sizeof (Nic->TxCookie));
+    Nic->TxHead = Nic->TxTail = Nic->TxPending = 0;
+    Nic->TxComplete = FALSE;
     Status = InitializeHardware (Nic);
     if (!EFI_ERROR (Status))
     {
@@ -449,7 +459,9 @@ Shutdown (EFI_SIMPLE_NETWORK_PROTOCOL *This)
   {
     gBS->SetTimer (Nic->PollEvent, TimerCancel, 0);
     Nic->Mode.State = EfiSimpleNetworkStarted;
-    Nic->TxCookie = NULL;
+    ZeroMem (Nic->TxCookie, sizeof (Nic->TxCookie));
+    Nic->TxHead = Nic->TxTail = Nic->TxPending = 0;
+    Nic->TxComplete = FALSE;
     Nic->Mode.ReceiveFilterSetting = 0;
     Nic->Mode.MCastFilterCount = 0;
   }
@@ -472,7 +484,7 @@ Reset (EFI_SIMPLE_NETWORK_PROTOCOL *This, BOOLEAN Extended)
   Status = HaltDma (Nic);
   if (!EFI_ERROR (Status))
   {
-    if (Nic->TxCookie && !Nic->TxComplete)
+    if (Nic->TxPending && !Nic->TxComplete)
     {
       Nic->TxComplete = TRUE;
     }
@@ -669,10 +681,13 @@ GetStatus (EFI_SIMPLE_NETWORK_PROTOCOL *This, UINT32 *Interrupt, VOID **TxBuffer
   }
   if (TxBuffer)
   {
-    *TxBuffer = Nic->TxComplete ? Nic->TxCookie : NULL;
+    *TxBuffer = Nic->TxComplete ? Nic->TxCookie[Nic->TxTail] : NULL;
     if (*TxBuffer)
     {
-      Nic->TxCookie = NULL;
+      Nic->TxCookie[Nic->TxTail] = NULL;
+      Nic->TxTail = (Nic->TxTail + 1) % TX_COUNT;
+      Nic->TxPending--;
+      Nic->TxComplete = FALSE;
     }
   }
   EfiReleaseLock (&Nic->Lock);
@@ -714,7 +729,7 @@ Transmit (EFI_SIMPLE_NETWORK_PROTOCOL *This, UINTN HeaderSize, UINTN Size, VOID 
     Status = EFI_NOT_READY;
     goto Done;
   }
-  if (Nic->TxCookie)
+  if (Nic->TxPending == TX_COUNT)
   {
     Status = EFI_NOT_READY;
     goto Done;
@@ -726,13 +741,18 @@ Transmit (EFI_SIMPLE_NETWORK_PROTOCOL *This, UINTN HeaderSize, UINTN Size, VOID 
     Bytes[12] = *Protocol >> 8;
     Bytes[13] = *Protocol;
   }
-  CopyMem (Nic->Dma->TxBuffer, Buffer, Size);
-  WriteBackInvalidateDataCacheRange (Nic->Dma->TxBuffer, ALIGN_VALUE (Size, 64));
-  Nic->Dma->Tx.Control = (UINT32)Size;
-  Nic->Dma->Tx.Status = DESC_OWN | BIT30 | TX_FIRST | TX_LAST | TX_CHAIN;
-  WriteBackInvalidateDataCacheRange (&Nic->Dma->Tx, sizeof (Nic->Dma->Tx));
-  Nic->TxCookie = Buffer;
-  Nic->TxComplete = FALSE;
+  UINTN Slot = Nic->TxHead;
+  CopyMem (Nic->Dma->TxBuffer[Slot], Buffer, Size);
+  WriteBackInvalidateDataCacheRange (Nic->Dma->TxBuffer[Slot],
+                                     ALIGN_VALUE (Size, 64));
+  Nic->Dma->Tx[Slot].Control = (UINT32)Size;
+  Nic->Dma->Tx[Slot].Status =
+      DESC_OWN | BIT30 | TX_FIRST | TX_LAST | TX_CHAIN;
+  WriteBackInvalidateDataCacheRange (&Nic->Dma->Tx[Slot],
+                                     sizeof (Nic->Dma->Tx[Slot]));
+  Nic->TxCookie[Slot] = Buffer;
+  Nic->TxHead = (Slot + 1) % TX_COUNT;
+  Nic->TxPending++;
   GmacWrite (&Nic->Hardware, DMA_TX_POLL, 1);
 Done:
   EfiReleaseLock (&Nic->Lock);
@@ -974,7 +994,7 @@ CreateNic (FDT_CLIENT_PROTOCOL *Fdt, INT32 Node)
   Nic->Mode.MaxMCastFilterCount = 16;
   Nic->Mode.IfType = 1;
   Nic->Mode.MacAddressChangeable = TRUE;
-  Nic->Mode.MultipleTxSupported = FALSE;
+  Nic->Mode.MultipleTxSupported = TRUE;
   Nic->Mode.MediaPresentSupported = TRUE;
   SetMem (&Nic->Mode.BroadcastAddress, sizeof (EFI_MAC_ADDRESS), 0xff);
   Status = GetAddress (Nic);
