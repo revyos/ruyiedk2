@@ -10,6 +10,8 @@
   Fastboot.c
   Image.c
   Image.h
+  Targets.c
+  Targets.h
   Usb.c
   Spi.c
 [Packages]
@@ -36,8 +38,10 @@
 
 [Protocols]
   gTh1520BootAreaProtocolGuid
+  gTh1520BootPartitionsProtocolGuid
   gTh1520UsbRoleProtocolGuid
 [Pcd]
+  gTh1520TokenSpaceGuid.PcdRecoveryMode
   gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
   gTh1520TokenSpaceGuid.PcdFirmwareImageLimit
   gTh1520TokenSpaceGuid.PcdFitConfiguration

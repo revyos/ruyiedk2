@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "Fastboot.h"
+#include "Targets.h"
 #include <Protocol/Th1520BootArea.h>
 #include <Library/PrintLib.h>
 #include <Library/UefiApplicationEntryPoint.h>
@@ -23,12 +24,17 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   BOOLEAN Complete = FALSE, Exit = FALSE;
   CHAR8 Command[65], Response[16];
   TH1520_BOOT_AREA_PROTOCOL *BootArea = NULL;
+  TH1520_BOOT_PARTITIONS_PROTOCOL *Partitions = NULL;
   TH1520_IMAGE_POLICY Policy = {
       (CONST CHAR8 *)PcdGetPtr (PcdFitConfiguration), (CONST CHAR8 *)PcdGetPtr (PcdBoardCompatible),
       PcdGetBool (PcdFirmwareOnEmmc) ? "emmc-boot0" : "spi-nor", PcdGet32 (PcdFirmwareImageLimit)};
   if (PcdGetBool (PcdFirmwareOnEmmc))
   {
     gBS->LocateProtocol (&gTh1520BootAreaProtocolGuid, NULL, (VOID **)&BootArea);
+  }
+  if (PcdGetBool (PcdRecoveryMode))
+  {
+    gBS->LocateProtocol (&gTh1520BootPartitionsProtocolGuid, NULL, (VOID **)&Partitions);
   }
   Status = gBS->SetWatchdogTimer (0, 0, 0, NULL);
   if (EFI_ERROR (Status))
@@ -49,6 +55,10 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     goto Out;
   }
   Print (L"USB fastboot: %a. ESC returns to the boot manager.\r\n", PcdGetPtr (PcdFirmwareName));
+  if (PcdGetBool (PcdRecoveryMode))
+  {
+    Print (L"Raw recovery targets: spi, emmcboot0, emmcboot1\r\n");
+  }
   while (!Exit)
   {
     if (!EFI_ERROR (gST->ConIn->ReadKeyStroke (gST->ConIn, &Key)) && Key.ScanCode == SCAN_ESC)
@@ -139,7 +149,31 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     else if (!AsciiStrnCmp (Command, "getvar:", 7))
     {
       CONST CHAR8 *Name = Command + 7, *Value = NULL;
-      if (!AsciiStrCmp (Name, "version"))
+      TH1520_FLASH_TARGET Target = Th1520TargetNone;
+      if (PcdGetBool (PcdRecoveryMode) && !AsciiStrnCmp (Name, "partition-size:", 15))
+      {
+        Target = Th1520RecoveryTarget (Name + 15);
+      }
+      if (Target != Th1520TargetNone)
+      {
+        UINTN Limit = Th1520TargetMaximum (Target, Partitions ? Partitions->Size : 0);
+        if (Limit)
+        {
+          AsciiSPrint (Response, sizeof (Response), "0x%08x", (UINT32)Limit);
+          Value = Response;
+        }
+      }
+      else if (PcdGetBool (PcdRecoveryMode) && !AsciiStrnCmp (Name, "partition-type:", 15) &&
+               Th1520RecoveryTarget (Name + 15) != Th1520TargetNone)
+      {
+        Value = "raw";
+      }
+      else if (PcdGetBool (PcdRecoveryMode) && !AsciiStrnCmp (Name, "has-slot:", 9) &&
+               Th1520RecoveryTarget (Name + 9) != Th1520TargetNone)
+      {
+        Value = "no";
+      }
+      else if (!AsciiStrCmp (Name, "version"))
       {
         Value = "0.4";
       }
@@ -234,6 +268,32 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
       if (!EFI_ERROR (Status))
       {
         Status = Reply ("OKAY", "");
+      }
+    }
+    else if (PcdGetBool (PcdRecoveryMode) && !AsciiStrnCmp (Command, "flash:", 6) &&
+             Th1520RecoveryTarget (Command + 6) != Th1520TargetNone)
+    {
+      TH1520_FLASH_TARGET Target = Th1520RecoveryTarget (Command + 6);
+      UINTN Limit = Th1520TargetMaximum (Target, Partitions ? Partitions->Size : 0);
+      if (!Complete || !Th1520ValidRawImage (Download, Done, Limit))
+      {
+        Status = Reply ("FAIL", "invalid raw image, size or unavailable target");
+      }
+      else
+      {
+        Status = Target == Th1520TargetSpi ? SpiFlash (Download, Done) :
+            Partitions->Write (Partitions,
+                Target == Th1520TargetEmmcBoot0 ? 1 : 2, Download, Done);
+        if (EFI_ERROR (Status))
+        {
+          CHAR8 Error[61];
+          AsciiSPrint (Error, sizeof (Error), "%a: %r", Command + 6, Status);
+          Status = Reply ("FAIL", Error);
+        }
+        else
+        {
+          Status = Reply ("OKAY", "");
+        }
       }
     }
     else if (!AsciiStrCmp (Command, "flash:loader"))
