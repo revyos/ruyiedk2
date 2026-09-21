@@ -6,10 +6,11 @@ Sipeed Lichee Pi 4A。
 - `platforms/Th1520Pkg/`：共用驱动、库、Fastboot 和启动界面。
 - `platforms/MelesPkg/`：Meles 板级配置。
 - `platforms/Lpi4aPkg/`：LPi4A 板级配置。
-- `tests/`：EDK2 驱动的主机测试及 HSM EFI 测试应用。
+- `tests/`：EDK2 驱动的主机测试及 HSM、I/O EFI 测试应用。
 - `tools/build.sh`、`Makefile`：EDK2 构建和测试入口。
 - `docs/display.md`：HDMI 实现及已有硬件验证记录。
 - `docs/recovery.md`：RAM 恢复配置及原始固件刷写目标。
+- `docs/io-performance.md`：SPI、eMMC、USB 和网卡测速及复现方式。
 
 U-Boot、OpenSBI、Linux 设备树、DDR/AON、镜像打包和刷写流程
 继续由上层 `th1520` 仓库维护，本次不迁移。

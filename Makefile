@@ -187,7 +187,10 @@ edk2-recovery-check:
 		-o $(EDK2_BUILD)/test-recovery
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-recovery
 
-.PHONY: edk2-emmc-check
+.PHONY: edk2-io-test edk2-emmc-check
+edk2-io-test: basetools
+	tools/build.sh -D IO_TEST -m tests/IoTest/IoTest.inf
+
 check: edk2-emmc-check
 edk2-emmc-check:
 	mkdir -p $(EDK2_BUILD)
@@ -199,7 +202,10 @@ edk2-emmc-check:
 		-o $(EDK2_BUILD)/test-emmc-adma
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-emmc-adma
 
-.PHONY: edk2-usb-register-check
+.PHONY: edk2-net-test edk2-usb-register-check
+edk2-net-test: basetools
+	tools/build.sh -D NET_TEST -m tests/NetTest/NetTest.inf
+
 check: edk2-usb-register-check
 edk2-usb-register-check:
 	mkdir -p $(EDK2_BUILD)

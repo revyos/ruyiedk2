@@ -179,3 +179,11 @@
 !ifdef HSM_TEST
   tests/HsmTest/HsmTest.inf
 !endif
+
+!ifdef IO_TEST
+  tests/IoTest/IoTest.inf
+!endif
+
+!ifdef NET_TEST
+  tests/NetTest/NetTest.inf
+!endif
