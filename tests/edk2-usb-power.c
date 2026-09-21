@@ -52,6 +52,12 @@ static UINT32 *Register (UINTN Address)
 UINT32 EFIAPI MmioWrite32 (UINTN Address, UINT32 Value)
 {
   Writes++;
+#ifndef TEST_LPI4A
+  if (Address == VBUS_DATA)
+    assert (*Register (0xffef010204ULL) & BIT8);
+  if (Address == ROUTE_DATA)
+    assert (*Register (0xffef010204ULL) & BIT6);
+#endif
   if (Address == VBUS_DATA || Address == VBUS_DIR || Address == VBUS_PAD ||
       Address == VBUS_MUX) VbusWrites++;
   if (Address == VBUS_DATA) {
