@@ -161,6 +161,8 @@ Initialize (VOID)
   UINT8 Ext[512];
   UserAreaSelected = FALSE;
   MmioOr32 (0xffef010204ULL, BIT30);
+  // PIO works without this policy, but the OS needs DDR access for ADMA.
+  MmioWrite32 (0xfffc0280c0ULL, MAX_UINT32);
   Pll = MmioRead32 (0xffef010030ULL);
   Cfg = MmioRead32 (0xffef010034ULL);
   Div = (Pll & 63) * ((Pll >> 20) & 7) * ((Pll >> 24) & 7);
