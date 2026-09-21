@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
-// TH1520 DWC MSHC eMMC, fixed 1.8 V I/O, 8-bit legacy timing and PIO.
+// TH1520 DWC MSHC eMMC, fixed 1.8 V I/O and cache-safe ADMA2.
 #include <Uefi.h>
+#include "Adma.h"
+#include <Library/CacheMaintenanceLib.h>
+#include <Protocol/FdtClient.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
@@ -20,6 +23,80 @@ STATIC UINT8 PartitionConfig;
 STATIC UINT64 BootAreaSize;
 STATIC EFI_LOCK ControllerLock;
 STATIC BOOLEAN UserAreaSelected;
+STATIC UINT8 *DmaBuffer;
+STATIC EMMC_ADMA_DESCRIPTOR *DmaTable;
+STATIC BOOLEAN DmaEnabled;
+STATIC UINT32 BusRate;
+
+STATIC UINT32
+MaximumRate (VOID)
+{
+  FDT_CLIENT_PROTOCOL *Fdt;
+  CONST VOID *Value;
+  UINT32 Size, Limit;
+  INT32 Node = -1;
+  UINTN Index;
+  STATIC CONST CHAR8 *HighSpeed[] = {
+      "cap-mmc-highspeed", "mmc-ddr-1_8v",
+      "mmc-hs200-1_8v", "mmc-hs400-1_8v"
+  };
+  if (EFI_ERROR (gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL,
+                                      (VOID **)&Fdt)))
+  {
+    return 25000000;
+  }
+  while (!EFI_ERROR (Fdt->FindNextCompatibleNode (
+      Fdt, "thead,th1520-dwcmshc", Node, &Node)))
+  {
+    if (EFI_ERROR (Fdt->GetNodeProperty (Fdt, Node, "reg", &Value,
+                                        &Size)) || Size != 16 ||
+        SwapBytes64 (ReadUnaligned64 (Value)) != MMC)
+    {
+      continue;
+    }
+    // HS200/HS400 board descriptions also permit the HS52 transition.
+    for (Index = 0; Index < ARRAY_SIZE (HighSpeed); Index++)
+    {
+      if (!EFI_ERROR (Fdt->GetNodeProperty (
+          Fdt, Node, HighSpeed[Index], &Value, &Size)))
+      {
+        break;
+      }
+    }
+    Limit = Index == ARRAY_SIZE (HighSpeed) ? 25000000 : 52000000;
+    if (!EFI_ERROR (Fdt->GetNodeProperty (Fdt, Node, "max-frequency",
+                                         &Value, &Size)) && Size == 4)
+    {
+      return MIN (Limit, SwapBytes32 (ReadUnaligned32 (Value)));
+    }
+    return Limit;
+  }
+  return 25000000;
+}
+
+STATIC EFI_STATUS
+PrepareDma (VOID *Data, UINTN Blocks, BOOLEAN Write)
+{
+  EFI_STATUS Status;
+  UINTN Bytes = Blocks * 512;
+  Status = EmmcBuildAdma (DmaTable, EMMC_ADMA_COUNT,
+                          (UINTN)DmaBuffer, Bytes);
+  if (EFI_ERROR (Status))
+  {
+    return Status;
+  }
+  if (Write)
+  {
+    CopyMem (DmaBuffer, Data, Bytes);
+  }
+  // Dedicated pages avoid touching adjacent caller-owned cache lines.
+  WriteBackInvalidateDataCacheRange (DmaBuffer, Bytes);
+  WriteBackDataCacheRange (DmaTable,
+                           sizeof (*DmaTable) * EMMC_ADMA_COUNT);
+  MmioWrite32 (MMC + 0x58, (UINT32)(UINTN)DmaTable);
+  MmioWrite32 (MMC + 0x5c, 0);
+  return EFI_SUCCESS;
+}
 STATIC EFI_STATUS
 WaitInterrupt (UINT32 Mask)
 {
@@ -47,6 +124,11 @@ Command (UINTN Index, UINT32 Argument, UINT16 Flags, VOID *Data, UINTN Blocks, B
   UINTN I, Block;
   UINT32 Word;
   EFI_STATUS Status;
+  BOOLEAN Dma = Data != NULL && DmaEnabled;
+  if (Data != NULL && (Blocks == 0 || Blocks > EMMC_DMA_SIZE / 512))
+  {
+    return EFI_BAD_BUFFER_SIZE;
+  }
   for (I = 0; I < 200000 && (MmioRead32 (MMC + 0x24) & 3); I++)
   {
     MicroSecondDelay (10);
@@ -58,9 +140,18 @@ Command (UINTN Index, UINT32 Argument, UINT16 Flags, VOID *Data, UINTN Blocks, B
   MmioWrite32 (MMC + 0x30, MAX_UINT32);
   if (Data)
   {
+    if (Dma)
+    {
+      Status = PrepareDma (Data, Blocks, Write);
+      if (EFI_ERROR (Status))
+      {
+        return Status;
+      }
+    }
     MmioWrite16 (MMC + 4, 512);
     MmioWrite16 (MMC + 6, (UINT16)Blocks);
-    MmioWrite16 (MMC + 0xc, (Write ? 0 : BIT4) | (Blocks > 1 ? BIT1 | BIT2 | BIT5 : 0));
+    MmioWrite16 (MMC + 0xc, (Dma ? BIT0 : 0) | (Write ? 0 : BIT4) |
+                     (Blocks > 1 ? BIT1 | BIT2 | BIT5 : 0));
     Flags |= BIT5;
   }
   else
@@ -82,7 +173,7 @@ Command (UINTN Index, UINT32 Argument, UINT16 Flags, VOID *Data, UINTN Blocks, B
       goto Error;
     }
   }
-  if (Data)
+  if (Data && !Dma)
   {
     for (Block = 0; Block < Blocks; Block++)
     {
@@ -114,6 +205,11 @@ Command (UINTN Index, UINT32 Argument, UINT16 Flags, VOID *Data, UINTN Blocks, B
       goto Error;
     }
   }
+  if (Dma && !Write)
+  {
+    InvalidateDataCacheRange (DmaBuffer, Blocks * 512);
+    CopyMem (Data, DmaBuffer, Blocks * 512);
+  }
   return EFI_SUCCESS;
 Error:
   DEBUG (
@@ -122,6 +218,12 @@ Error:
   for (I = 0; I < 10000 && MmioRead8 (MMC + 0x2f); I++)
   {
     MicroSecondDelay (10);
+  }
+  if (I == 10000)
+  {
+    // Do not reuse DMA pages after an unacknowledged controller reset.
+    DmaEnabled = FALSE;
+    Media.MediaPresent = FALSE;
   }
   return Status;
 }
@@ -137,6 +239,7 @@ Clock (UINT32 Rate)
   {
     return EFI_UNSUPPORTED;
   }
+  BusRate = ClockRate / Div;
   Div /= 2;
   MmioWrite16 (MMC + 0x2c, (UINT16)(((Div & 255) << 8) | ((Div & 0x300) >> 2) | 1));
   for (N = 0; N < 10000; N++)
@@ -160,6 +263,8 @@ Initialize (VOID)
   EFI_STATUS Status;
   UINT8 Ext[512];
   UserAreaSelected = FALSE;
+  Media.MediaPresent = FALSE;
+  DmaEnabled = FALSE;
   MmioOr32 (0xffef010204ULL, BIT30);
   // PIO works without this policy, but the OS needs DDR access for ADMA.
   MmioWrite32 (0xfffc0280c0ULL, MAX_UINT32);
@@ -298,17 +403,44 @@ Initialize (VOID)
     return Status;
   }
   MmioWrite8 (MMC + 0x28, BIT5);
-  Status = Clock (25000000);
+  Div = MaximumRate ();
+  if (Div > 25000000 && (Ext[196] & 3))
+  {
+    Div = MIN (Div, (Ext[196] & BIT1) ? 52000000 : 26000000);
+    Status = Command (6, 0x03b90100, 0x1b, NULL, 0, FALSE);
+    if (EFI_ERROR (Status))
+    {
+      return Status;
+    }
+    MmioOr8 (MMC + 0x28, BIT2);
+    // TH1520 DWC MSHC maps MMC HS52 to SDR50, as in snps_sdhci.c.
+    MmioAndThenOr16 (MMC + 0x3e, (UINT16)~7U, 2);
+  }
+  else
+  {
+    Div = MIN (Div, 25000000);
+  }
+  if (Div == 0)
+  {
+    return EFI_UNSUPPORTED;
+  }
+  Status = Clock (Div);
   if (EFI_ERROR (Status))
   {
     return Status;
+  }
+  if (DmaTable != NULL && (MmioRead32 (MMC + 0x40) & BIT19))
+  {
+    MmioAndThenOr8 (MMC + 0x28, (UINT8)~(BIT3 | BIT4), BIT4);
+    DmaEnabled = TRUE;
   }
   Media.MediaId = 1;
   Media.MediaPresent = TRUE;
   Media.BlockSize = 512;
   Media.IoAlign = 1;
   UserAreaSelected = TRUE;
-  DEBUG ((DEBUG_INFO, "Meles eMMC: %Lu sectors, 8-bit PIO\n", Media.LastBlock + 1));
+  Print (L"TH1520 eMMC: %u kHz, 8-bit %s\n", BusRate / 1000,
+         DmaEnabled ? L"ADMA2" : L"PIO");
   return EFI_SUCCESS;
 }
 STATIC EFI_STATUS EFIAPI
@@ -325,6 +457,10 @@ Transfer (UINT32 MediaId, EFI_LBA Lba, UINTN Size, VOID *Buffer, BOOLEAN Write)
 {
   UINTN Blocks, Count;
   EFI_STATUS Status;
+  if (!Media.MediaPresent)
+  {
+    return EFI_NO_MEDIA;
+  }
   if (MediaId != Media.MediaId)
   {
     return EFI_MEDIA_CHANGED;
@@ -348,7 +484,7 @@ Transfer (UINT32 MediaId, EFI_LBA Lba, UINTN Size, VOID *Buffer, BOOLEAN Write)
   }
   while (Blocks)
   {
-    Count = MIN (Blocks, 128);
+    Count = MIN (Blocks, DmaEnabled ? EMMC_DMA_SIZE / 512 : 128);
     Status = Command (Write ? (Count == 1 ? 24 : 25) : (Count == 1 ? 17 : 18), (UINT32)Lba, 0x1a,
                       Buffer, Count, Write);
     if (EFI_ERROR (Status))
@@ -521,6 +657,15 @@ EmmcInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
 {
   EFI_STATUS Status;
   EFI_HANDLE Handle = NULL;
+  EFI_PHYSICAL_ADDRESS Address = MAX_UINT32;
+  // 32-bit ADMA works independently of SDHCI v4/64-bit mode selection.
+  Status = gBS->AllocatePages (AllocateMaxAddress, EfiBootServicesData,
+      EFI_SIZE_TO_PAGES (EMMC_DMA_SIZE) + 1, &Address);
+  if (!EFI_ERROR (Status))
+  {
+    DmaTable = (VOID *)(UINTN)Address;
+    DmaBuffer = (VOID *)(UINTN)(Address + EFI_PAGE_SIZE);
+  }
   EfiInitializeLock (&ControllerLock, TPL_NOTIFY);
   Status = Initialize ();
   if (EFI_ERROR (Status))

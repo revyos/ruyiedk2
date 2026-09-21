@@ -186,3 +186,28 @@ edk2-recovery-check:
 		platforms/Th1520Pkg/Application/Fastboot/Targets.c \
 		-o $(EDK2_BUILD)/test-recovery
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-recovery
+
+.PHONY: edk2-emmc-check
+check: edk2-emmc-check
+edk2-emmc-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -Wall -Wextra -fsanitize=address,undefined -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		tests/edk2-emmc-adma.c \
+		platforms/Th1520Pkg/Drivers/EmmcDxe/Adma.c \
+		-o $(EDK2_BUILD)/test-emmc-adma
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-emmc-adma
+
+.PHONY: edk2-emmc-fdt-check
+check: edk2-emmc-fdt-check
+edk2-emmc-fdt-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=undefined -ffunction-sections \
+		-fdata-sections -Wl,--gc-sections -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+		-Iplatforms/Th1520Pkg/Include tests/edk2-emmc-fdt.c \
+		-o $(EDK2_BUILD)/test-emmc-fdt
+	$(EDK2_BUILD)/test-emmc-fdt

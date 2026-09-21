@@ -8,10 +8,14 @@
   ENTRY_POINT = EmmcInitialize
 [Sources]
   EmmcDxe.c
+  Adma.c
+  Adma.h
 [Packages]
+  EmbeddedPkg/EmbeddedPkg.dec
   Th1520Pkg/Th1520Pkg.dec
   MdePkg/MdePkg.dec
 [LibraryClasses]
+  CacheMaintenanceLib
   PcdLib
   UefiLib
   MemoryAllocationLib
@@ -23,13 +27,14 @@
   UefiBootServicesTableLib
   UefiDriverEntryPoint
 [Protocols]
+  gFdtClientProtocolGuid
   gTh1520BootAreaProtocolGuid
   gTh1520BootPartitionsProtocolGuid
   gEfiBlockIoProtocolGuid
   gEfiDevicePathProtocolGuid
   gEfiCpuArchProtocolGuid
 [Depex]
-  gEfiCpuArchProtocolGuid
+  gEfiCpuArchProtocolGuid AND gFdtClientProtocolGuid
 [Pcd]
   gTh1520TokenSpaceGuid.PcdRecoveryMode
   gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
