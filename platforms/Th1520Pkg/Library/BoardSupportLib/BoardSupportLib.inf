@@ -8,10 +8,16 @@
   LIBRARY_CLASS = Th1520BoardSupportLib
 [Sources]
   BoardSupport.c
+  Fdt.c
+  Pinctrl.c
+  BoardFdt.h
 [Packages]
+  EmbeddedPkg/EmbeddedPkg.dec
   MdePkg/MdePkg.dec
   Th1520Pkg/Th1520Pkg.dec
 [LibraryClasses]
   BaseLib
+  BaseMemoryLib
+  FdtLib
   IoLib
   TimerLib

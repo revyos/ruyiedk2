@@ -117,6 +117,15 @@ edk2-gmac-address-check:
 		-o $(EDK2_BUILD)/test-gmac-address
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-gmac-address
 
+BOARD_LIB = platforms/Th1520Pkg/Library/BoardSupportLib
+FDT_SOURCES = $(BOARD_LIB)/Fdt.c $(BOARD_LIB)/Pinctrl.c
+FDT_TEST_FLAGS = -g -fsanitize=address,undefined -fshort-wchar \
+  -ffunction-sections -fdata-sections -Wl,--gc-sections \
+  -I$(EDK2_SOURCE)/MdePkg/Include \
+  -I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+  -I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+  -Iplatforms/Th1520Pkg/Include
+
 .PHONY: edk2-meles-usb-check
 edk2-meles-usb-check:
 	mkdir -p $(EDK2_BUILD)
@@ -165,11 +174,8 @@ edk2-check:
 .PHONY: edk2-gmac-check
 edk2-gmac-check:
 	mkdir -p $(EDK2_BUILD)
-	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
-		-I$(EDK2_SOURCE)/MdePkg/Include \
-		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
-		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
-		tests/edk2-gmac-fdt.c \
+	$(CC) $(FDT_TEST_FLAGS) tests/edk2-gmac-fdt.c \
+		tests/edk2-fdt-host.c $(FDT_SOURCES) \
 		platforms/Th1520Pkg/Drivers/GmacDxe/Fdt.c \
 		-lfdt -o $(EDK2_BUILD)/test-gmac-fdt
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-gmac-fdt \

@@ -13,10 +13,12 @@
   Phy.c
   Address.c
 [Packages]
+  Th1520Pkg/Th1520Pkg.dec
   MdePkg/MdePkg.dec
   EmbeddedPkg/EmbeddedPkg.dec
   CryptoPkg/CryptoPkg.dec
 [LibraryClasses]
+  Th1520BoardSupportLib
   FdtLib
   HobLib
   BaseLib
