@@ -5,7 +5,7 @@
 #define GPIO 0xffe7f34000ULL
 #define PAD 0xffec007000ULL
 #define FLASH_SIZE SIZE_8MB
-STATIC UINT32 FrameSize;
+STATIC UINT32 FrameSize, FifoDepth;
 STATIC VOID
 ChipSelect (BOOLEAN High)
 {
@@ -21,34 +21,45 @@ ChipSelect (BOOLEAN High)
 STATIC EFI_STATUS
 Exchange (CONST UINT8 *Tx, UINT8 *Rx, UINTN Size)
 {
-  UINTN I, N;
-  UINT32 Value;
+  UINTN Sent = 0, Received = 0, Count, Before, N;
+  UINT64 Progress;
+  UINT8 Value;
   MmioWrite32 (SPI + 8, 0);
   MmioWrite32 (SPI, FrameSize);
   MmioWrite32 (SPI + 0x10, 1);
   MmioWrite32 (SPI + 8, 1);
   ChipSelect (FALSE);
-  for (I = 0; I < Size; I++)
+  Progress = GetPerformanceCounter ();
+  while (Received < Size)
   {
-    MmioWrite32 (SPI + 0x60, Tx ? Tx[I] : 0xff);
-    for (N = 0; N < 10000; N++)
+    Before = Received;
+    // Include frames still in TX when reserving RX FIFO capacity.
+    Count = MIN (Size - Sent, FifoDepth - (Sent - Received));
+    while (Count--)
     {
-      if (MmioRead32 (SPI + 0x28) & BIT3)
-      {
-        break;
-      }
-      MicroSecondDelay (1);
+      MmioWrite32 (SPI + 0x60, Tx ? Tx[Sent] : 0xff);
+      Sent++;
     }
-    if (N == 10000)
+    Count = MIN (MmioRead32 (SPI + 0x24), Sent - Received);
+    while (Count--)
+    {
+      Value = (UINT8)MmioRead32 (SPI + 0x60);
+      if (Rx)
+      {
+        Rx[Received] = Value;
+      }
+      Received++;
+    }
+    if (Received != Before)
+    {
+      Progress = GetPerformanceCounter ();
+    }
+    else if (GetTimeInNanoSecond (GetPerformanceCounter () - Progress) >
+             100000000)
     {
       ChipSelect (TRUE);
       MmioWrite32 (SPI + 8, 0);
       return EFI_TIMEOUT;
-    }
-    Value = MmioRead32 (SPI + 0x60);
-    if (Rx)
-    {
-      Rx[I] = (UINT8)Value;
     }
   }
   for (N = 0; N < 10000; N++)
@@ -116,6 +127,8 @@ SpiFlash (CONST VOID *Buffer, UINTN Length)
   UINTN Offset, Count, Pin, Shift, Reg;
   EFI_STATUS Status;
   CHAR8 Progress[64];
+  UINT32 Pll, Cfg, Div, Divider;
+  UINT64 Rate;
   if (Length == 0 || Length > FLASH_SIZE)
   {
     return EFI_BAD_BUFFER_SIZE;
@@ -139,8 +152,37 @@ SpiFlash (CONST VOID *Buffer, UINTN Length)
   MmioWrite32 (SPI + 8, 0);
   MmioWrite32 (SPI, 0xffffffff);
   FrameSize = (MmioRead32 (SPI) & 15) ? 7 : 7U << 16;
-  // VIDEO_PLL is at most 3 GHz; /400 stays below the board's 10 MHz limit.
-  MmioWrite32 (SPI + 0x14, 400);
+  // Read the QSPI parent rate without changing the shared VIDEO_PLL.
+  Pll = MmioRead32 (0xffef010030ULL);
+  Cfg = MmioRead32 (0xffef010034ULL);
+  Div = (Pll & 63) * ((Pll >> 20) & 7) * ((Pll >> 24) & 7);
+  if (!Div)
+  {
+    return EFI_DEVICE_ERROR;
+  }
+  Rate = LShiftU64 ((Pll >> 8) & 4095, 24);
+  if (!(Cfg & BIT24))
+  {
+    Rate += Cfg & 0xffffff;
+  }
+  Rate = (Cfg & BIT30) ? 24000000 :
+      DivU64x32 (RShiftU64 (MultU64x32 (Rate, 24000000), 24), Div);
+  Divider = (UINT32)DivU64x32 (Rate + 9999999, 10000000);
+  Divider = (MAX (Divider, 2) + 1) & ~1U;
+  if (Divider > 65534)
+  {
+    return EFI_UNSUPPORTED;
+  }
+  MmioWrite32 (SPI + 0x14, Divider);
+  for (FifoDepth = 1; FifoDepth < 256; FifoDepth++)
+  {
+    MmioWrite32 (SPI + 0x18, FifoDepth);
+    if (MmioRead32 (SPI + 0x18) != FifoDepth)
+    {
+      break;
+    }
+  }
+  MmioWrite32 (SPI + 0x18, 0);
   MmioWrite32 (SPI + 0x2c, 0);
   Status = Exchange (Probe, Id, sizeof (Id));
   if (EFI_ERROR (Status))
