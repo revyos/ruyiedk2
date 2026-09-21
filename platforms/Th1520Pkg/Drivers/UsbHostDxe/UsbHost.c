@@ -54,13 +54,26 @@ StartHost (VOID)
   DEBUG ((DEBUG_INFO, "Meles USB host: HCCPARAMS1=%08x\n", MmioRead32 (USB + 0x10)));
   return EFI_SUCCESS;
 }
+// ERDP only returns credits for consumed events. The pinned XhciDxe
+// updates software pointers, not DMA memory, between its ERDP accesses.
+STATIC UINTN EventDequeue;
+STATIC BOOLEAN
+DequeueAccess (EFI_PCI_IO_PROTOCOL_WIDTH Width, UINT8 Bar,
+                UINT64 Offset, UINTN Count)
+{
+  return Bar == 0 && Width == EfiPciIoWidthUint32 && Count == 1 &&
+         (Offset == EventDequeue || Offset == EventDequeue + 4);
+}
 STATIC EFI_STATUS EFIAPI
 ReadRegisters (EFI_PCI_IO_PROTOCOL *This, EFI_PCI_IO_PROTOCOL_WIDTH Width, UINT8 Bar, UINT64 Offset,
                UINTN Count, VOID *Buffer)
 {
   EFI_STATUS Status;
   MemoryFence ();
-  UsbDmaSync ();
+  if (!DequeueAccess (Width, Bar, Offset, Count))
+  {
+    UsbDmaSync ();
+  }
   Status = SavedRead (This, Width, Bar, Offset, Count, Buffer);
   MemoryFence ();
   return Status;
@@ -72,7 +85,10 @@ WriteRegisters (EFI_PCI_IO_PROTOCOL *This, EFI_PCI_IO_PROTOCOL_WIDTH Width, UINT
   EFI_STATUS Status;
   // Publish descriptor stores before ringing a doorbell on weakly ordered C910.
   MemoryFence ();
-  UsbDmaSync ();
+  if (!DequeueAccess (Width, Bar, Offset, Count))
+  {
+    UsbDmaSync ();
+  }
   Status = SavedWrite (This, Width, Bar, Offset, Count, Buffer);
   MemoryFence ();
   return Status;
@@ -86,8 +102,9 @@ InitializeDma (NON_DISCOVERABLE_DEVICE *Device)
   {
     // xHCI allocates descriptors in whole 64-byte units. Keep them in a
     // private pool and synchronize around register accesses, including
-    // doorbells and the event-dequeue reads after completion. Streaming
-    // data uses separate page-aligned bounce buffers.
+    // doorbells and USBSTS reads before event processing. ERDP only
+    // returns event-ring credits. Streaming data uses separate pages.
+    EventDequeue = (MmioRead32 (USB + 0x18) & ~31U) + 0x38;
     SavedRead = Pci->Mem.Read;
     SavedWrite = Pci->Mem.Write;
     Pci->Mem.Read = ReadRegisters;

@@ -199,6 +199,19 @@ edk2-emmc-check:
 		-o $(EDK2_BUILD)/test-emmc-adma
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-emmc-adma
 
+.PHONY: edk2-usb-register-check
+check: edk2-usb-register-check
+edk2-usb-register-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=undefined -ffunction-sections \
+		-fdata-sections -Wl,--gc-sections -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
+		-Iplatforms/Th1520Pkg/Include tests/edk2-usb-registers.c \
+		-o $(EDK2_BUILD)/test-usb-registers
+	$(EDK2_BUILD)/test-usb-registers
+
 .PHONY: edk2-emmc-fdt-check
 check: edk2-emmc-fdt-check
 edk2-emmc-fdt-check:
