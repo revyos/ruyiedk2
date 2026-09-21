@@ -74,7 +74,7 @@ EFI_STATUS
 DisplayPrepare (DISPLAY_HW *Hw)
 {
   UINTN Try;
-  // SPL already releases VO and configures both display IOPMPs.
+  // The M-mode platform releases VO and configures both display IOPMPs.
   // Keep GPU clocks, reset and power domain untouched.
   MmioOr32 (VO + 0x50, BIT (0) | BIT (6) | BIT (7) | BIT (8) | BIT (9) | BIT (10) | BIT (11) |
                            BIT (20) | BIT (21) | BIT (22) | BIT (27) | BIT (28));

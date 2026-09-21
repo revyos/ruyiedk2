@@ -29,6 +29,7 @@ StartHost (VOID)
   if (EFI_ERROR (Status))
     return Status;
   MmioOr32 (0xfffc02d104ULL, 15);
+  MmioWrite32 (0xfffc02e0c0ULL, MAX_UINT32);
   MmioOr32 (0xffec03f034ULL, 1);
   MicroSecondDelay (10);
   MmioAnd32 (0xffec02c014ULL, ~7U);

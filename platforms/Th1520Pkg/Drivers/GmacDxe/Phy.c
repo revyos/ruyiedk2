@@ -104,6 +104,7 @@ GmacPlatformInitialize (GMAC_HARDWARE *Hw)
   MmioOr32 (0xffef010150ULL, BIT12);
   MmioOr32 (0xffef010204ULL, BIT22 | BIT21 | (Hw->Index == 0 ? BIT19 : BIT26) |
                                  (Hw->MdioBase == 0xffe7070000ULL ? BIT19 : BIT26));
+  MmioWrite32 (Hw->Index == 0 ? 0xfffc0010c0ULL : 0xfffc0020c0ULL, MAX_UINT32);
   Status = GmacConfigurePins (Hw);
   if (EFI_ERROR (Status))
   {
