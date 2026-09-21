@@ -406,11 +406,11 @@ SelectPartition (UINT8 Partition)
 }
 
 STATIC EFI_STATUS EFIAPI
-BootAreaRead (TH1520_BOOT_AREA_PROTOCOL *This, UINTN Offset, UINTN Length, VOID *Buffer)
+BootPartitionRead (UINTN Partition, UINT64 Limit, UINTN Offset, UINTN Length, VOID *Buffer)
 {
   EFI_STATUS Status, Restore;
-  if (This == NULL || Buffer == NULL || Offset % 512 || Length % 512 || Offset > This->Size ||
-      Length > This->Size - Offset)
+  if (Partition < 1 || Partition > 2 || Limit > BootAreaSize || Buffer == NULL ||
+      Offset % 512 || Length % 512 || Offset > Limit || Length > Limit - Offset)
   {
     return EFI_INVALID_PARAMETER;
   }
@@ -419,7 +419,7 @@ BootAreaRead (TH1520_BOOT_AREA_PROTOCOL *This, UINTN Offset, UINTN Length, VOID 
     return EFI_SUCCESS;
   }
   EfiAcquireLock (&ControllerLock);
-  Status = SelectPartition (1); // eMMC hardware boot partition 1 is Linux boot0.
+  Status = SelectPartition ((UINT8)Partition);
   if (!EFI_ERROR (Status))
   {
     Status = Transfer (Media.MediaId, Offset / 512, Length, Buffer, FALSE);
@@ -430,13 +430,13 @@ BootAreaRead (TH1520_BOOT_AREA_PROTOCOL *This, UINTN Offset, UINTN Length, VOID 
 }
 
 STATIC EFI_STATUS EFIAPI
-BootAreaWrite (TH1520_BOOT_AREA_PROTOCOL *This, CONST VOID *Buffer, UINTN Length)
+BootPartitionWrite (UINTN Partition, UINT64 Limit, CONST VOID *Buffer, UINTN Length)
 {
   EFI_STATUS Status = EFI_SUCCESS, Restore;
   UINT8 *Block, *Verify;
   UINTN Offset, Count, Padded;
-  if (This == NULL || Buffer == NULL || Length == 0 || Length > This->Size ||
-      ALIGN_VALUE (Length, 512) > This->Size)
+  if (Partition < 1 || Partition > 2 || Limit > BootAreaSize || Buffer == NULL ||
+      Length == 0 || Length > Limit || ALIGN_VALUE (Length, 512) > Limit)
   {
     return EFI_INVALID_PARAMETER;
   }
@@ -455,7 +455,7 @@ BootAreaWrite (TH1520_BOOT_AREA_PROTOCOL *This, CONST VOID *Buffer, UINTN Length
     return EFI_OUT_OF_RESOURCES;
   }
   EfiAcquireLock (&ControllerLock);
-  Status = SelectPartition (1);
+  Status = SelectPartition ((UINT8)Partition);
   for (Offset = 0; !EFI_ERROR (Status) && Offset < Length; Offset += Count)
   {
     Count = MIN (SIZE_64KB, Length - Offset);
@@ -478,6 +478,39 @@ BootAreaWrite (TH1520_BOOT_AREA_PROTOCOL *This, CONST VOID *Buffer, UINTN Length
   FreePool (Block);
   return EFI_ERROR (Status) ? Status : Restore;
 }
+
+STATIC EFI_STATUS EFIAPI
+BootAreaRead (TH1520_BOOT_AREA_PROTOCOL *This, UINTN Offset, UINTN Length, VOID *Buffer)
+{
+  return This == NULL ? EFI_INVALID_PARAMETER :
+      BootPartitionRead (1, This->Size, Offset, Length, Buffer);
+}
+
+STATIC EFI_STATUS EFIAPI
+BootAreaWrite (TH1520_BOOT_AREA_PROTOCOL *This, CONST VOID *Buffer, UINTN Length)
+{
+  return This == NULL ? EFI_INVALID_PARAMETER :
+      BootPartitionWrite (1, This->Size, Buffer, Length);
+}
+
+STATIC EFI_STATUS EFIAPI
+BootPartitionsRead (TH1520_BOOT_PARTITIONS_PROTOCOL *This, UINTN Partition,
+                    UINTN Offset, UINTN Length, VOID *Buffer)
+{
+  return This == NULL ? EFI_INVALID_PARAMETER :
+      BootPartitionRead (Partition, BootAreaSize, Offset, Length, Buffer);
+}
+
+STATIC EFI_STATUS EFIAPI
+BootPartitionsWrite (TH1520_BOOT_PARTITIONS_PROTOCOL *This, UINTN Partition,
+                     CONST VOID *Buffer, UINTN Length)
+{
+  return This == NULL ? EFI_INVALID_PARAMETER :
+      BootPartitionWrite (Partition, BootAreaSize, Buffer, Length);
+}
+
+STATIC TH1520_BOOT_PARTITIONS_PROTOCOL BootPartitions = {
+    0, BootPartitionsRead, BootPartitionsWrite};
 
 STATIC TH1520_BOOT_AREA_PROTOCOL BootArea = {0, BootAreaRead, BootAreaWrite};
 
@@ -503,6 +536,12 @@ EmmcInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
     BootArea.Size = PcdGet32 (PcdFirmwareImageLimit);
     Status = gBS->InstallProtocolInterface (&Handle, &gTh1520BootAreaProtocolGuid,
                                             EFI_NATIVE_INTERFACE, &BootArea);
+  }
+  if (!EFI_ERROR (Status) && PcdGetBool (PcdRecoveryMode) && BootAreaSize != 0)
+  {
+    BootPartitions.Size = BootAreaSize;
+    Status = gBS->InstallProtocolInterface (&Handle, &gTh1520BootPartitionsProtocolGuid,
+                                            EFI_NATIVE_INTERFACE, &BootPartitions);
   }
   return Status;
 }

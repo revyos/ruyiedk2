@@ -24,11 +24,13 @@
   UefiDriverEntryPoint
 [Protocols]
   gTh1520BootAreaProtocolGuid
+  gTh1520BootPartitionsProtocolGuid
   gEfiBlockIoProtocolGuid
   gEfiDevicePathProtocolGuid
   gEfiCpuArchProtocolGuid
 [Depex]
   gEfiCpuArchProtocolGuid
 [Pcd]
+  gTh1520TokenSpaceGuid.PcdRecoveryMode
   gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
   gTh1520TokenSpaceGuid.PcdFirmwareImageLimit
