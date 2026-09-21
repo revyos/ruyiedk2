@@ -52,16 +52,20 @@ INF EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
 INF MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
 INF MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf
 INF MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf
+!if $(RECOVERY_BUILD) == FALSE
 INF MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf
+!endif
 INF MdeModulePkg/Universal/SerialDxe/SerialDxe.inf
 INF MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
 INF MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
 INF MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
 INF MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
+!if $(RECOVERY_BUILD) == FALSE
 INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
 INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
 INF MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
 INF FatPkg/EnhancedFatDxe/Fat.inf
+!endif
 INF UefiCpuPkg/CpuTimerDxeRiscV64/CpuTimerDxeRiscV64.inf
 INF EmbeddedPkg/Drivers/FdtClientDxe/FdtClientDxe.inf
 INF MdeModulePkg/Universal/ReportStatusCodeRouter/RuntimeDxe/ReportStatusCodeRouterRuntimeDxe.inf
@@ -70,6 +74,7 @@ INF MdeModulePkg/Universal/StatusCodeHandler/RuntimeDxe/StatusCodeHandlerRuntime
 INF Th1520Pkg/Application/Fastboot/Fastboot.inf
 
 INF Th1520Pkg/Drivers/EmmcDxe/EmmcDxe.inf
+!if $(RECOVERY_BUILD) == FALSE
 INF MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceDxe.inf
 INF MdeModulePkg/Bus/Pci/XhciDxe/XhciDxe.inf
 INF MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
@@ -84,18 +89,23 @@ FILE FREEFORM = b9317e41-2a84-4d83-8e31-a67838815ff2 {
   SECTION RAW = Th1520Pkg/Drivers/LogoDxe/openRuyi.bmp
 }
 INF Th1520Pkg/Drivers/SoftwareRngDxe/SoftwareRngDxe.inf
+!endif
 !include NetworkPkg/Network.fdf.inc
 
+!if $(RECOVERY_BUILD) == FALSE
 INF MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
 INF MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
 INF MdeModulePkg/Universal/DriverHealthManagerDxe/DriverHealthManagerDxe.inf
 INF MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
 INF MdeModulePkg/Application/UiApp/UiApp.inf
+!endif
 
 INF MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
 
+!if $(RECOVERY_BUILD) == FALSE
 INF MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
 INF Th1520Pkg/Drivers/SmbiosDxe/SmbiosDxe.inf
+!endif
 
 [FV.FVMAIN_COMPACT]
 FvAlignment        = 16

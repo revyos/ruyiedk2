@@ -13,6 +13,7 @@ export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(
 )}
 case "${EDK2_BOARD:-meles}" in
   meles) platform=MelesPkg/Meles.dsc ;;
+  meles-recovery) platform=MelesPkg/MelesRecovery.dsc ;;
   lpi4a) platform=Lpi4aPkg/Lpi4a.dsc ;;
   *) echo "Unknown EDK2_BOARD: $EDK2_BOARD" >&2; exit 1 ;;
 esac

@@ -1,8 +1,15 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 [Defines]
+!ifndef RECOVERY_BUILD
+  DEFINE RECOVERY_BUILD = FALSE
+!endif
   DEFINE DEBUG_ON_SERIAL_PORT = TRUE
   DEFINE SECURE_BOOT_ENABLE = FALSE
+!if $(RECOVERY_BUILD) == TRUE
+  DEFINE NETWORK_ENABLE = FALSE
+!else
   DEFINE NETWORK_ENABLE = TRUE
+!endif
   DEFINE NETWORK_SNP_ENABLE = FALSE
   DEFINE NETWORK_IP4_ENABLE = TRUE
   DEFINE NETWORK_IP6_ENABLE = FALSE
@@ -11,7 +18,11 @@
   DEFINE NETWORK_ISCSI_ENABLE = FALSE
   DEFINE NETWORK_VLAN_ENABLE = FALSE
   DEFINE NETWORK_TLS_ENABLE = FALSE
+!if $(RECOVERY_BUILD) == TRUE
+  DEFINE BUILD_SHELL = FALSE
+!else
   DEFINE BUILD_SHELL = TRUE
+!endif
   DEFINE ACPIVIEW_ENABLE = FALSE
 !include MdePkg/MdeLibs.dsc.inc
 !include NetworkPkg/Network.dsc.inc
@@ -31,7 +42,11 @@
   TpmMeasurementLib|MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
   ImagePropertiesRecordLib|MdeModulePkg/Library/ImagePropertiesRecordLib/ImagePropertiesRecordLib.inf
   PlatformSecLib|Th1520Pkg/Library/PlatformSecLib/PlatformSecLib.inf
+!if $(RECOVERY_BUILD) == TRUE
+  PlatformBootManagerLib|Th1520Pkg/Library/RecoveryBootManagerLib/RecoveryBootManagerLib.inf
+!else
   PlatformBootManagerLib|Th1520Pkg/Library/BootManagerLib/BootManagerLib.inf
+!endif
   RiscVMmuLib|Th1520Pkg/Library/BareMmuLib/BareMmuLib.inf
   CacheMaintenanceLib|Th1520Pkg/Library/CacheMaintenanceLib/CacheMaintenanceLib.inf
   PlatformHookLib|MdeModulePkg/Library/BasePlatformHookLibNull/BasePlatformHookLibNull.inf
@@ -43,6 +58,11 @@
   DebugLib|MdePkg/Library/BaseDebugLibNull/BaseDebugLibNull.inf
   ResetSystemLib|Th1520Pkg/Library/ResetSystemLib/ResetSystemLib.inf
 [PcdsFixedAtBuild]
+!if $(RECOVERY_BUILD) == TRUE
+  # No forms browser is included in the serial recovery image.
+  gEfiMdeModulePkgTokenSpaceGuid.PcdDriverHealthConfigureForm|{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+!endif
+  gTh1520TokenSpaceGuid.PcdRecoveryMode|$(RECOVERY_BUILD)
   gTh1520TokenSpaceGuid.PcdBoardManufacturer|"$(BOARD_VENDOR)"
   gTh1520TokenSpaceGuid.PcdBoardProduct|"$(BOARD_PRODUCT)"
   gTh1520TokenSpaceGuid.PcdFirmwareName|"$(FIRMWARE_NAME)"
@@ -83,7 +103,11 @@
   gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutColumn|80
   gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutRow|25
   gEfiMdeModulePkgTokenSpaceGuid.PcdEmuVariableNvModeEnable|TRUE
+!if $(RECOVERY_BUILD) == TRUE
+  gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|0
+!else
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|10
+!endif
 [Components]
   UefiCpuPkg/SecCore/SecCoreNative.inf {
     <LibraryClasses>
@@ -140,12 +164,14 @@
   MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
   MdeModulePkg/Universal/DriverHealthManagerDxe/DriverHealthManagerDxe.inf
   MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
+!if $(RECOVERY_BUILD) == FALSE
   MdeModulePkg/Application/UiApp/UiApp.inf {
     <LibraryClasses>
       NULL|MdeModulePkg/Library/DeviceManagerUiLib/DeviceManagerUiLib.inf
       NULL|MdeModulePkg/Library/BootManagerUiLib/BootManagerUiLib.inf
       NULL|MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManagerUiLib.inf
   }
+!endif
   MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
   MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
   Th1520Pkg/Drivers/SmbiosDxe/SmbiosDxe.inf

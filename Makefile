@@ -20,6 +20,8 @@ EDK2_PLATFORM := Lpi4a
 EDK2_BOOT := emmc-boot0
 EDK2_IMAGE := lpi4a-edk2-boot0.bin
 IMAGE_BUILD := $(FIRMWARE_BUILD)/edk2-lpi4a
+else ifeq ($(EDK2_BOARD),meles-recovery)
+EDK2_PLATFORM := MelesRecovery
 else
 $(error Unsupported EDK2_BOARD=$(EDK2_BOARD))
 endif
@@ -40,6 +42,10 @@ edk2-firmware: basetools
 
 edk2-lpi4a:
 	$(MAKE) edk2 EDK2_BOARD=lpi4a
+
+.PHONY: edk2-recovery
+edk2-recovery:
+	$(MAKE) edk2 EDK2_BOARD=meles-recovery
 
 edk2-hsm-test: basetools
 	tools/build.sh -D HSM_TEST -m tests/HsmTest/HsmTest.inf

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = RecoveryBootManagerLib
+  FILE_GUID = 702369c5-c6a4-487b-832b-6d74ed0caa34
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = PlatformBootManagerLib
+[Sources]
+  RecoveryBootManager.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  OvmfPkg/OvmfPkg.dec
+[LibraryClasses]
+  DevicePathLib
+  MemoryAllocationLib
+  UefiBootManagerLib
+  UefiBootServicesTableLib
+  UefiLib
+[Guids]
+  gEdkiiPlatformHasDeviceTreeGuid
+  gEfiEndOfDxeEventGroupGuid
+[Protocols]
+  gEfiLoadedImageProtocolGuid
