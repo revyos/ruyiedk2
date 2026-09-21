@@ -91,8 +91,6 @@ PlatformInitialization (
 
   SerialPortInitialize ();
 
-  Th1520BoardEarlyInit ();
-
   DEBUG ((DEBUG_INFO, "%a: Build FDT HOB - FDT at address: 0x%x \n", __func__, FdtPointer));
   Base = FdtPointer;
   if (FdtCheckHeader (Base) != 0) {
@@ -117,6 +115,9 @@ PlatformInitialization (
   }
 
   *FdtHobData = (UINTN)NewBase;
+
+  // Board reset delays use TimerLib, which obtains timebase from the FDT HOB.
+  Th1520BoardEarlyInit ();
 
   PopulateIoResources (Base, "snps,dw-apb-uart");
   BuildMemoryAllocationHob (PcdGet32 (PcdOvmfDxeMemFvBase), SIZE_4MB, EfiBootServicesData);
