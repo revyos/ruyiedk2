@@ -1,12 +1,11 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 [Defines]
   INF_VERSION = 0x0001001b
-  BASE_NAME = MelesResetSystemLib
+  BASE_NAME = Th1520ResetSystemLib
   FILE_GUID = 9ec51738-1e95-48cf-a95b-cc8371f20a5f
   MODULE_TYPE = DXE_RUNTIME_DRIVER
   VERSION_STRING = 1.0
   LIBRARY_CLASS = ResetSystemLib|DXE_RUNTIME_DRIVER
-  CONSTRUCTOR = ResetInitialize
 [Sources]
   ResetSystemLib.c
 [Packages]
@@ -14,10 +13,3 @@
 [LibraryClasses]
   BaseLib
   RiscVSbiLib
-  DxeServicesTableLib
-  IoLib
-  TimerLib
-  UefiBootServicesTableLib
-  UefiRuntimeLib
-[Guids]
-  gEfiEventVirtualAddressChangeGuid

@@ -97,6 +97,7 @@ edk2-reset-check:
 		-fdata-sections \
 		-Wl,--gc-sections -fshort-wchar \
 		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
 		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
 		tests/edk2-reset.c \
 		platforms/Th1520Pkg/Library/ResetSystemLib/ResetSystemLib.c \
