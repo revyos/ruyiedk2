@@ -55,13 +55,30 @@ SPI erases whole 4 KiB sectors covering the image. eMMC pads its final
 512-byte block with `0xff`. Bytes beyond that erase/write span remain
 unchanged. The existing `flash:loader` validation is also retained.
 
-## Validation status
+## Validation
 
-Host tests cover target names, size bounds, unavailable eMMC and sparse
-rejection. Both normal board profiles and the recovery profile compile.
-RAM hardware testing has reached BDS and initialized both eMMC boot
-partition interfaces. Publish the DTB HOB before board reset delays,
-retain the mandatory Capsule architectural protocol, and disable the
-optional driver-health form check when no forms browser is included.
-End-to-end Fastboot enumeration and persistent writes still require
-hardware verification; this profile remains under bring-up.
+Meles 16 GiB hardware completed the BootROM RAM -> coreboot DDR ->
+OpenSBI -> EDK2 path and enumerated automatically as `meles-recovery`.
+The image is 1 MiB, below the 1152 KiB BootROM download limit. OpenSBI
+uses its original relocatable dynamic binary; boot harts 1 and 2 were
+observed without a hart-0 policy.
+
+The recovery service reported 8 MiB SPI and 4 MiB per eMMC boot area.
+It rejected a sparse input before writing. A 1 MiB image was written to
+SPI, boot0 and boot1, with each writer's readback comparison passing.
+The eMMC user area was not written and boot selection was preserved.
+
+The SPI image restarted and returned to Fastboot. A temporary SPI boot
+stage also loaded the rest of the image from eMMC boot0 and returned to
+Fastboot, after which the SPI-source boot stage was restored. This
+validates coreboot's eMMC CBFS path, but not BootROM's direct eMMC
+startup or boot1 source selection.
+
+The DEBUG run caught dependencies required by the minimal profile:
+publish the DTB HOB before board reset delays, retain the mandatory
+Capsule architectural protocol, and disable the optional driver-health
+form check when no forms browser is included. The RELEASE SPI payload
+also completed hardware startup.
+
+Host tests cover target names, bounds, unavailable eMMC and sparse
+rejection. Both normal board profiles and the recovery profile build.
