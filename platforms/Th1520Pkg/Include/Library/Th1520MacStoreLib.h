@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+#pragma once
+#include <Uefi.h>
+#include <Protocol/Th1520MacConfig.h>
+#define TH1520_MAC_REGION_SIZE SIZE_8KB
+#define TH1520_MAC_COPY_STRIDE SIZE_4KB
+
+typedef EFI_STATUS (*TH1520_MAC_READ)(UINTN Offset, VOID *Block);
+typedef EFI_STATUS (*TH1520_MAC_WRITE)(UINTN Offset, CONST VOID *Block);
+EFI_STATUS Th1520MacRead (TH1520_MAC_READ Read, UINT8 *Mac);
+EFI_STATUS Th1520MacWrite (
+    TH1520_MAC_READ Read, TH1520_MAC_WRITE Write, CONST UINT8 *Mac);
+
+EFI_STATUS Th1520MacAdjacent (CONST UINT8 *Base, UINT8 *Mac);
+
+BOOLEAN Th1520MacValid (CONST UINT8 *Mac);
+BOOLEAN Th1520MacSettingsValid (CONST TH1520_MAC_SETTINGS *Settings);
+EFI_STATUS Th1520MacGenerate (UINT8 *Mac);
+EFI_STATUS Th1520MacReadSettings (
+    TH1520_MAC_READ Read, TH1520_MAC_SETTINGS *Settings);
+EFI_STATUS Th1520MacWriteSettings (
+    TH1520_MAC_READ Read, TH1520_MAC_WRITE Write,
+    CONST TH1520_MAC_SETTINGS *Settings);

@@ -256,6 +256,18 @@ edk2-nvstore-check:
 		-lz -o $(EDK2_BUILD)/test-nvstore
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-nvstore
 
+.PHONY: edk2-mac-store-check
+check: edk2-mac-store-check
+edk2-mac-store-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-Iplatforms/Th1520Pkg/Include tests/edk2-mac-store.c \
+		platforms/Th1520Pkg/Library/MacStoreLib/MacStore.c \
+		-lz -o $(EDK2_BUILD)/test-mac-store
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-mac-store
+
 .PHONY: edk2-spi-runtime-check
 check: edk2-spi-runtime-check
 edk2-spi-runtime-check:

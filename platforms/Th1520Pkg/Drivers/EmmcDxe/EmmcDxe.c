@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 // TH1520 DWC MSHC eMMC, fixed 1.8 V I/O and cache-safe ADMA2.
 #include <Uefi.h>
+#include <Guid/EventGroup.h>
 #include "Adma.h"
 #include <Library/CacheMaintenanceLib.h>
 #include <Protocol/FdtClient.h>
@@ -12,6 +13,8 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Protocol/BlockIo.h>
 #include <Protocol/Th1520BootArea.h>
+#include <Protocol/Th1520MacStore.h>
+#include <Library/Th1520MacStoreLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PcdLib.h>
 #include <Library/UefiLib.h>
@@ -674,7 +677,9 @@ BootPartitionsWrite (TH1520_BOOT_PARTITIONS_PROTOCOL *This, UINTN Partition,
                      CONST VOID *Buffer, UINTN Length)
 {
   return This == NULL ? EFI_INVALID_PARAMETER :
-      BootPartitionWrite (Partition, BootAreaSize, Buffer, Length);
+      BootPartitionWrite (Partition, Partition == 1 ?
+          BootAreaSize - TH1520_MAC_REGION_SIZE : BootAreaSize,
+          Buffer, Length);
 }
 
 STATIC TH1520_BOOT_PARTITIONS_PROTOCOL BootPartitions = {
@@ -682,12 +687,70 @@ STATIC TH1520_BOOT_PARTITIONS_PROTOCOL BootPartitions = {
 
 STATIC TH1520_BOOT_AREA_PROTOCOL BootArea = {0, BootAreaRead, BootAreaWrite};
 
+STATIC EFI_STATUS
+MacBlockRead (UINTN Offset, VOID *Block)
+{
+  if (Offset > TH1520_MAC_REGION_SIZE - 512)
+    return EFI_INVALID_PARAMETER;
+  return BootPartitionRead (1, BootAreaSize,
+      BootAreaSize - TH1520_MAC_REGION_SIZE + Offset, 512, Block);
+}
+
+STATIC EFI_STATUS
+MacBlockWrite (UINTN Offset, CONST VOID *Block)
+{
+  EFI_STATUS Status, Restore;
+  if (Offset > TH1520_MAC_REGION_SIZE - 512)
+    return EFI_INVALID_PARAMETER;
+  EFI_LBA Lba = (BootAreaSize - TH1520_MAC_REGION_SIZE + Offset) / 512;
+  EfiAcquireLock (&ControllerLock);
+  Status = SelectPartition (1);
+  if (!EFI_ERROR (Status))
+    Status = Transfer (Media.MediaId, Lba, 512, (VOID *)Block, TRUE);
+  Restore = SelectPartition (0);
+  EfiReleaseLock (&ControllerLock);
+  return EFI_ERROR (Status) ? Status : Restore;
+}
+
+STATIC BOOLEAN MacLocked;
+STATIC VOID EFIAPI
+LockMac (EFI_EVENT Event, VOID *Context)
+{
+  MacLocked = TRUE;
+}
+
+STATIC EFI_STATUS EFIAPI
+MacRead (UINT8 *Mac)
+{
+  return Th1520MacRead (MacBlockRead, Mac);
+}
+STATIC EFI_STATUS EFIAPI
+MacWrite (CONST UINT8 *Mac)
+{
+  return MacLocked ? EFI_WRITE_PROTECTED :
+      Th1520MacWrite (MacBlockRead, MacBlockWrite, Mac);
+}
+STATIC EFI_STATUS EFIAPI
+MacGetSettings (TH1520_MAC_SETTINGS *Settings)
+{
+  return Th1520MacReadSettings (MacBlockRead, Settings);
+}
+STATIC EFI_STATUS EFIAPI
+MacSetSettings (CONST TH1520_MAC_SETTINGS *Settings)
+{
+  return Th1520MacWriteSettings (MacBlockRead, MacBlockWrite, Settings);
+}
+STATIC TH1520_MAC_STORE_PROTOCOL MacStore = {
+  MacRead, MacWrite, MacGetSettings, MacSetSettings
+};
+
 EFI_STATUS EFIAPI
 EmmcInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
 {
   EFI_STATUS Status;
   EFI_HANDLE Handle = NULL;
   EFI_PHYSICAL_ADDRESS Address = MAX_UINT32;
+  EFI_EVENT MacLockEvent;
   Status = ParseHardware ();
   if (EFI_ERROR (Status))
     return Status;
@@ -723,5 +786,11 @@ EmmcInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
     Status = gBS->InstallProtocolInterface (&Handle, &gTh1520BootPartitionsProtocolGuid,
                                             EFI_NATIVE_INTERFACE, &BootPartitions);
   }
+  if (!EFI_ERROR (Status) && BootAreaSize >= TH1520_MAC_REGION_SIZE)
+    Status = gBS->InstallProtocolInterface (&Handle,
+        &gTh1520MacStoreProtocolGuid, EFI_NATIVE_INTERFACE, &MacStore);
+  if (!EFI_ERROR (Status))
+    Status = gBS->CreateEventEx (EVT_NOTIFY_SIGNAL, TPL_NOTIFY, LockMac,
+        NULL, &gEfiEndOfDxeEventGroupGuid, &MacLockEvent);
   return Status;
 }

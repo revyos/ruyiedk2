@@ -28,12 +28,14 @@ Th1520TargetMaximum (TH1520_FLASH_TARGET Target, UINT64 BootAreaSize)
 {
   if (Target == Th1520TargetSpi)
   {
-    return SIZE_8MB;
+    return SIZE_8MB - SIZE_256KB;
   }
   if ((Target == Th1520TargetEmmcBoot0 || Target == Th1520TargetEmmcBoot1) &&
       BootAreaSize <= MAX_UINTN)
   {
-    return (UINTN)BootAreaSize;
+    return Target == Th1520TargetEmmcBoot0 ?
+        (BootAreaSize > SIZE_8KB ? BootAreaSize - SIZE_8KB : 0) :
+        (UINTN)BootAreaSize;
   }
   return 0;
 }

@@ -31,9 +31,11 @@ int main (void)
   for (UINTN I = 0; I < sizeof (Invalid) / sizeof (Invalid[0]); I++) {
     assert (Th1520RecoveryTarget (Invalid[I]) == Th1520TargetNone);
   }
-  assert (Th1520TargetMaximum (Th1520TargetSpi, 0) == SIZE_8MB);
+  assert (Th1520TargetMaximum (Th1520TargetSpi, 0) ==
+          SIZE_8MB - SIZE_256KB);
   assert (Th1520TargetMaximum (Th1520TargetEmmcBoot0, 0) == 0);
-  assert (Th1520TargetMaximum (Th1520TargetEmmcBoot0, SIZE_4MB) == SIZE_4MB);
+  assert (Th1520TargetMaximum (Th1520TargetEmmcBoot0, SIZE_4MB) ==
+          SIZE_4MB - SIZE_8KB);
   assert (Th1520TargetMaximum (Th1520TargetEmmcBoot1, SIZE_4MB) == SIZE_4MB);
   assert (Th1520TargetMaximum (Th1520TargetNone, SIZE_4MB) == 0);
   assert (!Th1520ValidRawImage (NULL, 1, SIZE_4MB));
