@@ -8,8 +8,9 @@
 static NV_CONTEXT Context;
 static UINT8 Flash[TH1520_NV_REGION_SIZE];
 static CHAR8 Current[16] = "old";
-static unsigned Sets, Inits, Writes;
+static unsigned Sets, Inits, Writes, Gets, Converts, FailConvert;
 static BOOLEAN FailWrite;
+static EFI_STATUS SpiConversion;
 EFI_GUID gTh1520NvStoreGuid = {1};
 static EFI_GUID TestGuid = {2};
 BOOLEAN EFIAPI EfiAtRuntime (VOID) { return TRUE; }
@@ -35,9 +36,17 @@ UINT32 EFIAPI CalculateCrc32 (VOID *P, UINTN N)
 { return crc32 (0, P, N); }
 EFI_STATUS Th1520SpiRuntimeInit (VOID) { Inits++; return EFI_SUCCESS; }
 EFI_STATUS Th1520SpiInitNative (VOID) { assert (0); return EFI_ABORTED; }
+EFI_STATUS EFIAPI EfiConvertPointer (UINTN Flags, VOID **Address)
+{
+  assert (Address);
+  return ++Converts == FailConvert ? EFI_NOT_FOUND : EFI_SUCCESS;
+}
+EFI_STATUS Th1520SpiConvertPointers (EFI_CONVERT_POINTER Convert)
+{ assert (Convert == EfiConvertPointer); return SpiConversion; }
 static EFI_STATUS EFIAPI
 Get (CHAR16 *Name, EFI_GUID *Guid, UINT32 *Attrs, UINTN *Size, VOID *Data)
 {
+  Gets++;
   if (StrCmp (Name, L"Test")) return EFI_NOT_FOUND;
   *Attrs = 7;
   *Size = strlen (Current) + 1;
@@ -99,6 +108,30 @@ int main (void)
   OriginalGet = Get;
   OriginalSet = Update;
   OriginalNext = Next;
+  // Physical-mode runtime calls are valid before SetVirtualAddressMap.
+  assert (SetVariable (L"Test", &TestGuid, 7, 4, "old") == EFI_SUCCESS);
+  assert (Sets == 1 && !Inits && !Writes);
+  Sets = Gets = 0;
+  // Every conversion matters, including the context and media callbacks.
+  for (FailConvert = 1; FailConvert <= 8; FailConvert++)
+  {
+    Converts = 0;
+    AddressChange (NULL, NULL);
+    Nv = NULL;
+    assert (SetVariable (L"Test", &TestGuid, 7, 4, "bad") ==
+            EFI_NOT_FOUND);
+    assert (!Gets && !Sets && !Inits && !Writes);
+    Nv = &Context;
+  }
+  FailConvert = 0;
+  SpiConversion = EFI_UNSUPPORTED;
+  AddressChange (NULL, NULL);
+  assert (SetVariable (L"Test", &TestGuid, 7, 4, "bad") ==
+          EFI_UNSUPPORTED);
+  assert (!Gets && !Sets && !Inits && !Writes);
+  SpiConversion = EFI_SUCCESS;
+  AddressChange (NULL, NULL);
+  assert (RuntimeStatus == EFI_SUCCESS);
   assert (Th1520NvUpdate (Nv->Cache, &Nv->Length, L"FallbackMac",
       &gTh1520NvStoreGuid, 3, 6, Mac) == EFI_SUCCESS);
   assert (Th1520NvUpdate (Nv->Cache, &Nv->Length, L"Test",

@@ -34,6 +34,7 @@ STATIC EFI_GET_NEXT_VARIABLE_NAME OriginalNext;
 STATIC EFI_STATUS Snapshot (VOID);
 STATIC EFI_HANDLE DriverHandle;
 STATIC VOID *Registration;
+STATIC EFI_STATUS RuntimeStatus = EFI_SUCCESS;
 
 STATIC EFI_STATUS EFIAPI
 SetVariable (CHAR16 *Name, EFI_GUID *Guid, UINT32 Attributes,
@@ -50,6 +51,9 @@ SetVariable (CHAR16 *Name, EFI_GUID *Guid, UINT32 Attributes,
       (!StrCmp (Name, L"FallbackMac") ||
        !StrCmp (Name, L"MacSettings")))
     return EFI_WRITE_PROTECTED;
+  // A failed conversion can leave even Nv itself inaccessible to the OS.
+  if (Runtime && EFI_ERROR (RuntimeStatus))
+    return RuntimeStatus;
   if (!Runtime)
     Tpl = gBS->RaiseTPL (TPL_NOTIFY);
   if (Nv->Busy)
@@ -189,17 +193,24 @@ Snapshot (VOID)
 STATIC VOID EFIAPI
 AddressChange (EFI_EVENT Event, VOID *Context)
 {
-  EfiConvertPointer (0, (VOID **)&OriginalSet);
-  EfiConvertPointer (0, (VOID **)&OriginalGet);
-  EfiConvertPointer (0, (VOID **)&OriginalNext);
-  EfiConvertPointer (0, &Nv->Store.Scratch);
-  EfiConvertPointer (0, (VOID **)&Nv->Store.Read);
-  EfiConvertPointer (0, (VOID **)&Nv->Store.Write);
-  EfiConvertPointer (0, (VOID **)&Nv->Store.Erase);
-  EFI_STATUS Status = Th1520SpiConvertPointers (EfiConvertPointer);
+  VOID **Pointers[] = {
+    (VOID **)&OriginalSet, (VOID **)&OriginalGet,
+    (VOID **)&OriginalNext, &Nv->Store.Scratch,
+    (VOID **)&Nv->Store.Read, (VOID **)&Nv->Store.Write,
+    (VOID **)&Nv->Store.Erase
+  };
+  EFI_STATUS Status, Result = EFI_SUCCESS;
+  for (UINTN I = 0; I < ARRAY_SIZE (Pointers); I++)
+  {
+    Status = EfiConvertPointer (0, Pointers[I]);
+    if (EFI_ERROR (Status))
+      Result = Status;
+  }
+  Status = Th1520SpiConvertPointers (EfiConvertPointer);
   if (EFI_ERROR (Status))
-    Nv->Status = Status;
-  EfiConvertPointer (0, (VOID **)&Nv);
+    Result = Status;
+  Status = EfiConvertPointer (0, (VOID **)&Nv);
+  RuntimeStatus = EFI_ERROR (Status) ? Status : Result;
 }
 
 STATIC VOID EFIAPI
@@ -274,11 +285,11 @@ NvStoreInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
       AddressChange, NULL, &gEfiEventVirtualAddressChangeGuid,
       &AddressEvent);
   if (EFI_ERROR (Status))
-    Nv->Status = Status;
+    RuntimeStatus = Nv->Status = Status;
   Status = gBS->CreateEventEx (EVT_NOTIFY_SIGNAL, TPL_NOTIFY,
       PrepareRuntime, NULL, &gEfiEventExitBootServicesGuid, &ExitEvent);
   if (EFI_ERROR (Status))
-    Nv->Status = Status;
+    RuntimeStatus = Nv->Status = Status;
   EDKII_VARIABLE_LOCK_PROTOCOL *Lock;
   if (!EFI_ERROR (gBS->LocateProtocol (&gEdkiiVariableLockProtocolGuid,
                                      NULL, (VOID **)&Lock)))
@@ -288,7 +299,11 @@ NvStoreInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
   gBS->CalculateCrc32 (gRT, gRT->Hdr.HeaderSize, &gRT->Hdr.CRC32);
   if (gST->ConOut)
     Print (L"UEFI variables: SPI, %r\n", Nv->Status);
-  return gBS->InstallProtocolInterface (&DriverHandle,
+  Status = gBS->InstallProtocolInterface (&DriverHandle,
       &gTh1520NvStoreReadyProtocolGuid, EFI_NATIVE_INTERFACE,
       &Nv->Status);
+  if (EFI_ERROR (Status))
+    Nv->Status = Status;
+  // The runtime table already points into this image: keep it resident.
+  return EFI_SUCCESS;
 }
