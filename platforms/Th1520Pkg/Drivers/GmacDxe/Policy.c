@@ -192,7 +192,8 @@ GmacGetConfig (TH1520_MAC_SETTINGS *Settings, TH1520_MAC_INFO Info[2])
   if (!Settings || !Info)
     return EFI_INVALID_PARAMETER;
   EFI_STATUS Status = GmacReadSettings (Settings);
-  if (Status != EFI_NOT_FOUND && EFI_ERROR (Status))
+  if (Status != EFI_NOT_FOUND && Status != EFI_COMPROMISED_DATA &&
+      EFI_ERROR (Status))
     return Status;
   for (UINTN I = 0; I < 2; I++)
   {

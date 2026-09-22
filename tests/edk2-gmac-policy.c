@@ -14,8 +14,13 @@ static INPUT Input[2];
 static BOOLEAN Reverse;
 static unsigned Fallbacks;
 static TH1520_MAC_SETTINGS Settings;
+static EFI_STATUS SettingsStatus;
 EFI_STATUS GmacReadSettings (TH1520_MAC_SETTINGS *Out)
-{ memcpy (Out, &Settings, sizeof (*Out)); return EFI_SUCCESS; }
+{
+  memcpy (Out, &Settings, sizeof (*Out));
+  if (EFI_ERROR (SettingsStatus)) memset (Out, 0, sizeof (*Out));
+  return SettingsStatus;
+}
 static const UINT8 Saved[6] = {2, 0x12, 0x34, 0x56, 0x78, 0x20};
 VOID *EFIAPI CopyMem (VOID *D, CONST VOID *S, UINTN N)
 { return memmove (D, S, N); }
@@ -112,6 +117,7 @@ static void Reset (void)
   Prepared = FALSE;
   Fallbacks = 0;
   memset (&Settings, 0, sizeof (Settings));
+  SettingsStatus = EFI_SUCCESS;
   Input[0].Present = Input[1].Present = TRUE;
 }
 static void ReadBoth (UINT8 Mac[2][6])
@@ -256,6 +262,16 @@ int main (void)
   UINT8 Edge[6] = {0xfe, 0xff, 0xff, 0xff, 0xff, 0xff};
   assert (Th1520MacAdjacent (Edge, Mac[1]) == EFI_SUCCESS);
   assert (Mac[1][0] == 0xfe && Mac[1][5] == 0xfe);
+  Reset ();
+  SettingsStatus = EFI_COMPROMISED_DATA;
+  ReadBoth (Mac);
+  TH1520_MAC_SETTINGS Config;
+  TH1520_MAC_INFO Info[2];
+  assert (GmacGetConfig (&Config, Info) == EFI_SUCCESS);
+  assert (!Config.OverrideMask && Info[0].Present);
+  assert (!memcmp (Info[0].Address, Saved, 6));
+  SettingsStatus = EFI_DEVICE_ERROR;
+  assert (GmacGetConfig (&Config, Info) == EFI_DEVICE_ERROR);
   puts ("MAC policy: invalid DT/eFuse skipped on both ports; "
         "priority and adjacency passed");
 }

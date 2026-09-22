@@ -162,9 +162,10 @@ GmacReadSettings (TH1520_MAC_SETTINGS *Settings)
   {
     Status = gRT->GetVariable (L"MacSettings", &gTh1520NvStoreGuid,
                                &Attributes, &Size, Settings);
-    if (!EFI_ERROR (Status) &&
-        (Size != sizeof (*Settings) ||
-         !(Attributes & EFI_VARIABLE_NON_VOLATILE)))
+    if (Status == EFI_BUFFER_TOO_SMALL ||
+        (!EFI_ERROR (Status) &&
+         (Size != sizeof (*Settings) ||
+          !(Attributes & EFI_VARIABLE_NON_VOLATILE))))
       Status = EFI_COMPROMISED_DATA;
   }
   if (EFI_ERROR (Status))
