@@ -19,7 +19,11 @@ U-Boot、OpenSBI、Linux 设备树、DDR/AON、镜像打包和刷写流程
 ## 构建
 
 默认使用现有的 `../edk2` 源码目录及其已初始化的子模块。
-验证使用的上游版本为 `6abc1c06585ffd66d23a74811a930d8d0f88cef7`。
+上游基线为 `6abc1c06585ffd66d23a74811a930d8d0f88cef7`。
+IPv4 配置界面还需要本地 EDK2 的两个通用修复：
+`b3b698bc6ff9`（保存值回显）和 `de036276f627`（提交时合并保存）。
+上层仓库的 `edk2` 子模块记录该版本；构建脚本不会自动打补丁。
+详见 [网络配置](docs/network-configuration.md)。
 需要 RISC-V GCC 工具链、GCC/G++、make、Python 3、NASM、
 UUID 和 OpenSSL 开发包；主机测试还需要 libfdt 开发包。
 

@@ -368,3 +368,18 @@ edk2-mac-settings-check:
 		platforms/Th1520Pkg/Library/MacStoreLib/MacStore.c \
 		-o $(EDK2_BUILD)/test-mac-settings
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-mac-settings
+
+.PHONY: edk2-ip4-form-check
+check: edk2-ip4-form-check
+edk2-ip4-form-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) $(FDT_TEST_FLAGS) -DMDEPKG_NDEBUG \
+		-DSTR_IP4_CONFIG2_FORM_HELP=1 -DSTR_IP4_DEVICE_FORM_HELP=2 \
+		-DgEfiCallerIdGuid=gEfiIp4Config2ProtocolGuid \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
+		-I$(EDK2_SOURCE)/NetworkPkg/Include \
+		-I$(EDK2_SOURCE)/NetworkPkg/Ip4Dxe tests/edk2-ip4-form.c \
+		$(EDK2_SOURCE)/NetworkPkg/Ip4Dxe/Ip4Config2Nv.c \
+		$(EDK2_SOURCE)/NetworkPkg/Ip4Dxe/Ip4Config2Impl.c \
+		-o $(EDK2_BUILD)/test-ip4-form
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-ip4-form
