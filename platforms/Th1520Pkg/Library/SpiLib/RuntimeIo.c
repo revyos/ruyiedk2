@@ -36,7 +36,10 @@ Map (UINTN Virtual, UINTN Physical, UINT64 Flags)
     UINTN Index = (Virtual >> (12 + 9 * Level)) & 511;
     if (!Level)
     {
-      Table[Index] = ((Physical >> 12) << 10) | Flags;
+      UINT64 Entry = ((Physical >> 12) << 10) | Flags;
+      if (Table[Index] && Table[Index] != Entry)
+        return EFI_ACCESS_DENIED;
+      Table[Index] = Entry;
       return EFI_SUCCESS;
     }
     if (!Table[Index])
@@ -55,11 +58,16 @@ Th1520SpiMapRuntimeIo (EFI_CONVERT_POINTER Convert, UINTN Spi, UINTN Ap)
 {
   VOID *Code = (VOID *)(UINTN)Th1520SpiMmio;
   EFI_STATUS Status;
+  RuntimeSatp = 0;
+  if (!Convert || ((Spi | Ap) & EFI_PAGE_MASK))
+    return EFI_INVALID_PARAMETER;
   if (!Tables)
     return EFI_NOT_READY;
   Status = Convert (0, &Code);
   if (EFI_ERROR (Status))
     return Status;
+  if (((UINTN)Code ^ (UINTN)Th1520SpiMmio) & EFI_PAGE_MASK)
+    return EFI_UNSUPPORTED;
   ZeroMem (Tables, TH1520_SPI_RUNTIME_PAGES * EFI_PAGE_SIZE);
   Used = 1;
   Status = Map ((UINTN)Code, (UINTN)Th1520SpiMmio, PTE_CODE);

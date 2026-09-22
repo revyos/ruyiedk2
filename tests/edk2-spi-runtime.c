@@ -129,5 +129,16 @@ int main (void)
   unsigned Before = Writes;
   assert (Th1520SpiRuntimeInit () == EFI_NOT_READY);
   assert (Writes == Before);
+  // A failed rebuild must not leave a partially replaced map active.
+  assert (Th1520SpiMapRuntimeIo (Convert, SPI, SPI) == EFI_ACCESS_DENIED);
+  assert (!RuntimeSatp);
+  assert (Th1520SpiMapRuntimeIo (Convert, 0x20060000, AP) ==
+          EFI_ACCESS_DENIED);
+  assert (!RuntimeSatp);
+  assert (Th1520SpiMapRuntimeIo (Convert, SPI + 1, AP) ==
+          EFI_INVALID_PARAMETER);
+  assert (Th1520SpiMapRuntimeIo (Convert, 1ULL << 38, AP) ==
+          EFI_UNSUPPORTED);
+  assert (!RuntimeSatp && Writes == Before);
   puts ("SPI runtime: native CS, VA conversion, no GPIO/clock/pad writes");
 }
