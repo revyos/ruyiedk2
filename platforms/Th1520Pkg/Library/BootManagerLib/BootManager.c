@@ -53,6 +53,20 @@ STATIC VOID
 RegisterApp (EFI_GUID *Guid, CHAR16 *Name, EFI_INPUT_KEY *Key, BOOLEAN Hidden);
 
 STATIC BOOLEAN
+IsFirmwareApp (EFI_DEVICE_PATH_PROTOCOL *Path, CONST EFI_GUID *Guid)
+{
+  for (; !IsDevicePathEnd (Path); Path = NextDevicePathNode (Path))
+    if (DevicePathType (Path) == MEDIA_DEVICE_PATH &&
+        DevicePathSubType (Path) == MEDIA_PIWG_FW_FILE_DP &&
+        DevicePathNodeLength (Path) ==
+            sizeof (MEDIA_FW_VOL_FILEPATH_DEVICE_PATH) &&
+        CompareGuid (EfiGetNameGuidFromFwVolDevicePathNode (
+            (CONST MEDIA_FW_VOL_FILEPATH_DEVICE_PATH *)Path), Guid))
+      return TRUE;
+  return FALSE;
+}
+
+STATIC BOOLEAN
 RemoveDuplicateApps (EFI_GUID *Guid, CHAR16 *Name, UINTN Keep)
 {
   UINTN Count;
@@ -66,20 +80,10 @@ RemoveDuplicateApps (EFI_GUID *Guid, CHAR16 *Name, UINTN Keep)
         (Options[I].Attributes & LOAD_OPTION_CATEGORY) !=
             LOAD_OPTION_CATEGORY_APP)
       continue;
-    for (EFI_DEVICE_PATH_PROTOCOL *P = Options[I].FilePath;
-         !IsDevicePathEnd (P); P = NextDevicePathNode (P))
-      if (DevicePathType (P) == MEDIA_DEVICE_PATH &&
-          DevicePathSubType (P) == MEDIA_PIWG_FW_FILE_DP &&
-          DevicePathNodeLength (P) ==
-              sizeof (MEDIA_FW_VOL_FILEPATH_DEVICE_PATH) &&
-          CompareGuid (EfiGetNameGuidFromFwVolDevicePathNode (
-              (CONST MEDIA_FW_VOL_FILEPATH_DEVICE_PATH *)P), Guid))
-      {
-        if (!EFI_ERROR (EfiBootManagerDeleteLoadOptionVariable (
+    if (IsFirmwareApp (Options[I].FilePath, Guid) &&
+        !EFI_ERROR (EfiBootManagerDeleteLoadOptionVariable (
             Options[I].OptionNumber, LoadOptionTypeBoot)))
-          Removed = TRUE;
-        break;
-      }
+      Removed = TRUE;
   }
   EfiBootManagerFreeLoadOptions (Options, Count);
   return Removed;
@@ -176,27 +180,20 @@ RegisterApp (EFI_GUID *Guid, CHAR16 *Name, EFI_INPUT_KEY *Key, BOOLEAN Hidden)
       EfiBootManagerGetLoadOptions (&Count, LoadOptionTypeBoot);
   for (UINTN I = 0; I < Count; I++)
   {
-    EFI_DEVICE_PATH_PROTOCOL *Node = Existing[I].FilePath;
-    for (; !IsDevicePathEnd (Node); Node = NextDevicePathNode (Node))
-      if (DevicePathType (Node) == MEDIA_DEVICE_PATH &&
-          DevicePathSubType (Node) == MEDIA_PIWG_FW_FILE_DP &&
-          DevicePathNodeLength (Node) ==
-              sizeof (MEDIA_FW_VOL_FILEPATH_DEVICE_PATH) &&
-          CompareGuid (EfiGetNameGuidFromFwVolDevicePathNode (
-              (CONST MEDIA_FW_VOL_FILEPATH_DEVICE_PATH *)Node), Guid))
-      {
-        // BDS adjusts FV paths after upgrades. Retain the option number,
-        // user ordering and the CRC referenced by existing hotkeys.
-        BOOLEAN Removed = RemoveDuplicateApps (
-            Guid, Name, Existing[I].OptionNumber);
-        if (Key != NULL && Removed)
-          EfiBootManagerDeleteKeyOptionVariable (NULL, 0, Key, NULL);
-        if (Key != NULL)
-          EfiBootManagerAddKeyOptionVariable (NULL,
-              (UINT16)Existing[I].OptionNumber, 0, Key, NULL);
-        EfiBootManagerFreeLoadOptions (Existing, Count);
-        return;
-      }
+    if (IsFirmwareApp (Existing[I].FilePath, Guid))
+    {
+      // BDS adjusts FV paths after upgrades. Retain the option number,
+      // user ordering and the CRC referenced by existing hotkeys.
+      BOOLEAN Removed = RemoveDuplicateApps (
+          Guid, Name, Existing[I].OptionNumber);
+      if (Key != NULL && Removed)
+        EfiBootManagerDeleteKeyOptionVariable (NULL, 0, Key, NULL);
+      if (Key != NULL)
+        EfiBootManagerAddKeyOptionVariable (NULL,
+            (UINT16)Existing[I].OptionNumber, 0, Key, NULL);
+      EfiBootManagerFreeLoadOptions (Existing, Count);
+      return;
+    }
   }
   EfiBootManagerFreeLoadOptions (Existing, Count);
   EFI_LOADED_IMAGE_PROTOCOL *Loaded;
