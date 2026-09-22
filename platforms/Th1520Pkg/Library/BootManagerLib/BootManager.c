@@ -8,6 +8,9 @@
 #include <Library/UefiLib.h>
 #include <Protocol/LoadedImage.h>
 #include <Protocol/FdtClient.h>
+#include <Library/UefiRuntimeServicesTableLib.h>
+#include <Library/Th1520MacStoreLib.h>
+#include <Protocol/Th1520MacStore.h>
 #include <Protocol/GraphicsOutput.h>
 #include <Guid/SerialPortLibVendor.h>
 #include <Guid/EventGroup.h>
@@ -149,6 +152,25 @@ RegisterApp (EFI_GUID *Guid, CHAR16 *Name, EFI_INPUT_KEY *Key, BOOLEAN Hidden)
   }
   FreePool (Path);
 }
+STATIC BOOLEAN
+AdjacentToGmac0 (FDT_CLIENT_PROTOCOL *Fdt, CONST UINT8 *Mac)
+{
+  INT32 Node = -1;
+  CONST VOID *P;
+  UINT32 Size;
+  UINT8 Adjacent[6];
+  while (!EFI_ERROR (Fdt->FindNextCompatibleNode (
+      Fdt, "thead,th1520-gmac", Node, &Node)))
+    if (!EFI_ERROR (Fdt->GetNodeProperty (Fdt, Node, "reg", &P, &Size)) &&
+        Size == 32 &&
+        SwapBytes64 (ReadUnaligned64 (P)) == 0xffe7070000ULL &&
+        !EFI_ERROR (Fdt->GetNodeProperty (
+            Fdt, Node, "mac-address", &P, &Size)) && Size == 6 &&
+        !EFI_ERROR (Th1520MacAdjacent (P, Adjacent)))
+      return !CompareMem (Adjacent, Mac, 6);
+  return FALSE;
+}
+
 STATIC VOID
 ReportNetworkAddress (VOID)
 {
@@ -186,10 +208,37 @@ ReportNetworkAddress (VOID)
     {
       continue;
     }
+    UINT8 Saved[6];
+    UINTN SavedSize = sizeof (Saved);
+    UINT32 Attributes = 0;
     Mac = Address;
+    EFI_STATUS Status;
+    TH1520_MAC_STORE_PROTOCOL *Store;
+    if (PcdGetBool (PcdFirmwareOnEmmc))
+    {
+      Status = gBS->LocateProtocol (&gTh1520MacStoreProtocolGuid,
+                                     NULL, (VOID **)&Store);
+      if (!EFI_ERROR (Status))
+        Status = Store->Read (Saved);
+      Attributes = EFI_VARIABLE_NON_VOLATILE;
+    }
+    else
+    {
+      Status = gRT->GetVariable (L"FallbackMac", &gTh1520NvStoreGuid,
+                                 &Attributes, &SavedSize, Saved);
+    }
+    BOOLEAN Persistent = !EFI_ERROR (Status) && SavedSize == 6 &&
+        (Attributes & EFI_VARIABLE_NON_VOLATILE) &&
+        !CompareMem (Saved, Mac, 5) &&
+        (Mac[5] == Saved[5] || Mac[5] == (UINT8)(Saved[5] + 1));
     Print (L"Warning: Factory Ethernet MAC is %s.\r\n", Description);
-    Print (L"Using random MAC %02x:%02x:%02x:%02x:%02x:%02x; may change after reset.\r\n", Mac[0],
-           Mac[1], Mac[2], Mac[3], Mac[4], Mac[5]);
+    BOOLEAN Derived = AdjacentToGmac0 (Fdt, Mac);
+    Print (L"Using %s MAC %02x:%02x:%02x:%02x:%02x:%02x.\r\n",
+        Derived ? L"GMAC0-adjacent" :
+        Persistent ? L"saved local" : L"temporary random", Mac[0],
+        Mac[1], Mac[2], Mac[3], Mac[4], Mac[5]);
+    if (!Persistent && !Derived)
+      Print (L"MAC could not be saved; it may change after reset.\r\n");
   }
 }
 STATIC UINT16 mBootTimeout;

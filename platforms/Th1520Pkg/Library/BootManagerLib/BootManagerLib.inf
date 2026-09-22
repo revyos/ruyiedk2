@@ -11,6 +11,7 @@
   BootManager.c
 
 [Packages]
+  Th1520Pkg/Th1520Pkg.dec
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
   UefiCpuPkg/UefiCpuPkg.dec
@@ -18,6 +19,8 @@
   OvmfPkg/OvmfPkg.dec
 
 [LibraryClasses]
+  Th1520MacStoreLib
+  UefiRuntimeServicesTableLib
   BootLogoLib
   BaseMemoryLib
   DevicePathLib
@@ -30,14 +33,17 @@
   UefiLib
 
 [Guids]
+  gTh1520NvStoreGuid
   gEdkiiPlatformHasDeviceTreeGuid
   gEfiEndOfDxeEventGroupGuid
   gEfiGlobalVariableGuid
   gEfiEventReadyToBootGuid
 [Protocols]
+  gTh1520MacStoreProtocolGuid
   gEfiGraphicsOutputProtocolGuid
   gEfiLoadedImageProtocolGuid
   gFdtClientProtocolGuid
 
 [Pcd]
+  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut

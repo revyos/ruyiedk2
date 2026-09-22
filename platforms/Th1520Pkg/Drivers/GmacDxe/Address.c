@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 // TH1520 factory MAC slots: GMAC0 at 0xb0, GMAC1 at 0xb6 (vendor BSP).
 #include "Gmac.h"
-#include <Library/BaseCryptLib.h>
-#include <Library/RngLib.h>
+#include <Library/PcdLib.h>
+#include <Library/Th1520MacStoreLib.h>
+#include <Library/UefiRuntimeServicesTableLib.h>
+#include <Protocol/Th1520MacStore.h>
+#include <Protocol/VariableLock.h>
 
 #define EFUSE_BASE 0xffff210000ULL
 #define EFUSE_CONTROL 0x00
@@ -80,9 +83,7 @@ EFI_STATUS
 GmacFallbackAddress (UINTN Index, UINT8 *Mac)
 {
   STATIC UINT8 Base[6];
-  STATIC BOOLEAN Ready;
-  UINT64 Samples[4];
-  UINT8 Digest[SHA256_DIGEST_SIZE];
+  STATIC BOOLEAN Ready, Locked;
 
   if (Index > 1 || Mac == NULL)
   {
@@ -90,27 +91,107 @@ GmacFallbackAddress (UINTN Index, UINT8 *Mac)
   }
   if (!Ready)
   {
-    Samples[0] = GetPerformanceCounter ();
-    if (!GetRandomNumber64 (&Samples[1]))
+    UINTN Size = sizeof (Base);
+    UINT32 Attributes = 0;
+    TH1520_MAC_STORE_PROTOCOL *Store;
+    EFI_STATUS Status;
+    if (PcdGetBool (PcdFirmwareOnEmmc))
     {
-      return EFI_DEVICE_ERROR;
+      Status = gBS->LocateProtocol (&gTh1520MacStoreProtocolGuid,
+                                     NULL, (VOID **)&Store);
+      if (!EFI_ERROR (Status))
+        Status = Store->Read (Base);
+      Attributes = EFI_VARIABLE_NON_VOLATILE;
     }
-    Samples[2] = GetPerformanceCounter ();
-    Samples[3] = 0xffe7070000ULL;
-    // Timer RngLib is best-effort software randomness. Mix full counters
-    // too, since its sampled low bytes wrap quickly. This is not entropy.
-    if (!Sha256HashAll (Samples, sizeof (Samples), Digest))
+    else
+      Status = gRT->GetVariable (L"FallbackMac", &gTh1520NvStoreGuid,
+                                 &Attributes, &Size, Base);
+    if (!EFI_ERROR (Status) && Size == sizeof (Base) &&
+        (Attributes & EFI_VARIABLE_NON_VOLATILE) &&
+        (Base[0] & 3) == 2 && !(Base[5] & 1))
+      Ready = TRUE;
+  }
+  if (!Ready)
+  {
+    EFI_STATUS Status = Th1520MacGenerate (Base);
+    if (EFI_ERROR (Status))
+      return Status;
+    // A failed save still permits networking; BDS reports it as temporary.
+    if (PcdGetBool (PcdFirmwareOnEmmc))
     {
-      return EFI_DEVICE_ERROR;
+      TH1520_MAC_STORE_PROTOCOL *Store;
+      if (!EFI_ERROR (gBS->LocateProtocol (&gTh1520MacStoreProtocolGuid,
+                                         NULL, (VOID **)&Store)))
+        Store->Write (Base);
     }
-    CopyMem (Base, Digest, sizeof (Base));
-    Base[0] = (Base[0] & 0xfc) | 2;
-    // Reserve an aligned pair: adding one cannot overflow the first octet
-    // or change the local/unicast bits, even for an all-ones hash tail.
-    Base[5] &= 0xfe;
+    else
+      gRT->SetVariable (L"FallbackMac", &gTh1520NvStoreGuid,
+          EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS,
+          sizeof (Base), Base);
     Ready = TRUE;
+  }
+  if (!PcdGetBool (PcdFirmwareOnEmmc) && !Locked)
+  {
+    EDKII_VARIABLE_LOCK_PROTOCOL *Lock;
+    if (!EFI_ERROR (gBS->LocateProtocol (&gEdkiiVariableLockProtocolGuid,
+                                       NULL, (VOID **)&Lock)))
+      Locked = !EFI_ERROR (Lock->RequestToLock (
+          Lock, L"FallbackMac", &gTh1520NvStoreGuid));
   }
   CopyMem (Mac, Base, sizeof (Base));
   Mac[5] += Index;
   return EFI_SUCCESS;
+}
+
+EFI_STATUS
+GmacReadSettings (TH1520_MAC_SETTINGS *Settings)
+{
+  EFI_STATUS Status;
+  UINTN Size = sizeof (*Settings);
+  UINT32 Attributes = 0;
+  SetMem (Settings, Size, 0);
+  if (PcdGetBool (PcdFirmwareOnEmmc))
+  {
+    TH1520_MAC_STORE_PROTOCOL *Store;
+    Status = gBS->LocateProtocol (&gTh1520MacStoreProtocolGuid,
+                                   NULL, (VOID **)&Store);
+    if (!EFI_ERROR (Status))
+      Status = Store->GetSettings (Settings);
+  }
+  else
+  {
+    Status = gRT->GetVariable (L"MacSettings", &gTh1520NvStoreGuid,
+                               &Attributes, &Size, Settings);
+    if (!EFI_ERROR (Status) &&
+        (Size != sizeof (*Settings) ||
+         !(Attributes & EFI_VARIABLE_NON_VOLATILE)))
+      Status = EFI_COMPROMISED_DATA;
+  }
+  if (EFI_ERROR (Status))
+    SetMem (Settings, sizeof (*Settings), 0);
+  else
+  {
+    Settings->OverrideMask &= 3;
+    for (UINTN I = 0; I < 2; I++)
+      if (!Th1520MacValid (Settings->Address[I]))
+        Settings->OverrideMask &= ~(1U << I);
+  }
+  return Status;
+}
+
+EFI_STATUS EFIAPI
+GmacWriteSettings (CONST TH1520_MAC_SETTINGS *Settings)
+{
+  if (!Th1520MacSettingsValid (Settings))
+    return EFI_INVALID_PARAMETER;
+  if (PcdGetBool (PcdFirmwareOnEmmc))
+  {
+    TH1520_MAC_STORE_PROTOCOL *Store;
+    EFI_STATUS Status = gBS->LocateProtocol (&gTh1520MacStoreProtocolGuid,
+                                             NULL, (VOID **)&Store);
+    return EFI_ERROR (Status) ? Status : Store->SetSettings (Settings);
+  }
+  return gRT->SetVariable (L"MacSettings", &gTh1520NvStoreGuid,
+      EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS,
+      sizeof (*Settings), (VOID *)Settings);
 }

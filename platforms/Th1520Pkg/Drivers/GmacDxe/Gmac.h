@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 #pragma once
 #include <Uefi.h>
+#include <Protocol/Th1520MacConfig.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/CacheMaintenanceLib.h>
@@ -83,3 +84,12 @@ EFI_STATUS
 GmacConfigurePins (GMAC_HARDWARE *Hw);
 
 EFI_STATUS GmacFallbackAddress (UINTN Index, UINT8 *Mac);
+
+EFI_STATUS GmacPrepareAddresses (FDT_CLIENT_PROTOCOL *Fdt);
+EFI_STATUS GmacSelectAddress (
+    FDT_CLIENT_PROTOCOL *Fdt, GMAC_HARDWARE *Hw, UINT8 *Mac);
+
+EFI_STATUS GmacReadSettings (TH1520_MAC_SETTINGS *Settings);
+EFI_STATUS EFIAPI GmacWriteSettings (CONST TH1520_MAC_SETTINGS *Settings);
+EFI_STATUS EFIAPI GmacGetConfig (
+    TH1520_MAC_SETTINGS *Settings, TH1520_MAC_INFO Info[2]);

@@ -89,21 +89,6 @@ ValidMac (CONST UINT8 *Mac)
   return !(Mac[0] & 1) && CompareMem (Mac, Zero, 6) != 0;
 }
 STATIC BOOLEAN
-AddressInUse (CONST UINT8 *Mac)
-{
-  LIST_ENTRY *Entry;
-  for (Entry = GetFirstNode (&Devices); !IsNull (&Devices, Entry);
-       Entry = GetNextNode (&Devices, Entry))
-  {
-    GMAC_DEVICE *Other = BASE_CR (Entry, GMAC_DEVICE, Link);
-    if (!CompareMem (Mac, Other->Mode.PermanentAddress.Addr, 6))
-    {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-STATIC BOOLEAN
 Broadcast (CONST UINT8 *Mac)
 {
   STATIC CONST UINT8 All[6] = {255, 255, 255, 255, 255, 255};
@@ -867,76 +852,6 @@ Done:
   return Status;
 }
 STATIC EFI_STATUS
-GetAddress (GMAC_DEVICE *Nic)
-{
-  FDT_CLIENT_PROTOCOL *Fdt;
-  INT32 Node;
-  CONST VOID *Property;
-  UINT32 Size;
-  CONST CHAR8 *Reason;
-  STATIC CONST UINT8 ZeroMac[6];
-  EFI_STATUS Status;
-  UINT8 *Mac = Nic->Mode.PermanentAddress.Addr;
-  Status = gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL, (VOID **)&Fdt);
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  Status = GmacFindNode (&Nic->Hardware, &Node);
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  Status = Fdt->GetNodeProperty (Fdt, Node, "mac-address", &Property, &Size);
-  if (EFI_ERROR (Status) || Size != 6 || !ValidMac (Property))
-  {
-    Status = Fdt->GetNodeProperty (Fdt, Node, "local-mac-address", &Property, &Size);
-  }
-  if (!EFI_ERROR (Status) && Size == 6 && ValidMac (Property) && !AddressInUse (Property))
-  {
-    CopyMem (Mac, Property, 6);
-  }
-  else
-  {
-    Status = GmacReadFactoryAddress (&Nic->Hardware, Mac);
-    if (EFI_ERROR (Status) || !ValidMac (Mac) || AddressInUse (Mac))
-    {
-      Reason = AddressInUse (Mac)                  ? "duplicate"
-               : EFI_ERROR (Status)                ? "unavailable"
-               : CompareMem (Mac, ZeroMac, 6) == 0 ? "empty"
-                                                   : "invalid";
-      Status = GmacFallbackAddress (Nic->Hardware.Index, Mac);
-      if (EFI_ERROR (Status))
-      {
-        return Status;
-      }
-      // DXE can run before ConOut exists. Let the boot manager show the
-      // warning once the console is connected, including in RELEASE builds.
-      Status = Fdt->SetNodeProperty (Fdt, Node, "thead,random-mac-reason", Reason,
-                                     (UINT32)AsciiStrSize (Reason));
-      if (EFI_ERROR (Status))
-      {
-        return Status;
-      }
-    }
-  }
-  // Pass the selected address to the OS.
-  // Linux prefers mac-address over local-mac-address, including duplicates
-  // rejected above. Keep both properties consistent with the active NIC.
-  Status = Fdt->SetNodeProperty (Fdt, Node, "mac-address", Mac, 6);
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  Status = Fdt->SetNodeProperty (Fdt, Node, "local-mac-address", Mac, 6);
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  CopyMem (&Nic->Mode.CurrentAddress, &Nic->Mode.PermanentAddress, sizeof (EFI_MAC_ADDRESS));
-  return EFI_SUCCESS;
-}
-STATIC EFI_STATUS
 CreateNic (FDT_CLIENT_PROTOCOL *Fdt, INT32 Node)
 {
   EFI_STATUS Status;
@@ -997,7 +912,11 @@ CreateNic (FDT_CLIENT_PROTOCOL *Fdt, INT32 Node)
   Nic->Mode.MultipleTxSupported = TRUE;
   Nic->Mode.MediaPresentSupported = TRUE;
   SetMem (&Nic->Mode.BroadcastAddress, sizeof (EFI_MAC_ADDRESS), 0xff);
-  Status = GetAddress (Nic);
+  Status = GmacSelectAddress (Fdt, &Nic->Hardware,
+                              Nic->Mode.PermanentAddress.Addr);
+  if (!EFI_ERROR (Status))
+    CopyMem (&Nic->Mode.CurrentAddress, &Nic->Mode.PermanentAddress,
+             sizeof (EFI_MAC_ADDRESS));
   if (EFI_ERROR (Status))
   {
     FreePool (Nic);
@@ -1074,6 +993,10 @@ GmacInitialize (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   {
     return Status;
   }
+  GmacPrepareAddresses (Fdt);
+  STATIC TH1520_MAC_CONFIG_PROTOCOL Config = {
+    GmacGetConfig, GmacWriteSettings
+  };
   while (!EFI_ERROR (Fdt->FindNextCompatibleNode (Fdt, "thead,th1520-gmac", Node, &Node)))
   {
     Status = CreateNic (Fdt, Node);
@@ -1086,5 +1009,7 @@ GmacInitialize (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
       DEBUG ((DEBUG_ERROR, "TH1520 GMAC node %d: %r\n", Node, Status));
     }
   }
-  return Result;
+  Status = gBS->InstallProtocolInterface (&ImageHandle,
+      &gTh1520MacConfigProtocolGuid, EFI_NATIVE_INTERFACE, &Config);
+  return EFI_ERROR (Status) ? Result : EFI_SUCCESS;
 }

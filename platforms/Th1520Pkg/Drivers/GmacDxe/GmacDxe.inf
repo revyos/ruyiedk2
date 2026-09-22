@@ -12,34 +12,45 @@
   Fdt.c
   Phy.c
   Address.c
+  Policy.c
 [Packages]
+  MdeModulePkg/MdeModulePkg.dec
   Th1520Pkg/Th1520Pkg.dec
   MdePkg/MdePkg.dec
   EmbeddedPkg/EmbeddedPkg.dec
-  CryptoPkg/CryptoPkg.dec
 [LibraryClasses]
+  Th1520MacStoreLib
+  PcdLib
+  UefiRuntimeServicesTableLib
   Th1520BoardSupportLib
   FdtLib
   HobLib
   BaseLib
   BaseMemoryLib
-  BaseCryptLib
   CacheMaintenanceLib
   DebugLib
   IoLib
   MemoryAllocationLib
-  RngLib
   TimerLib
   UefiBootServicesTableLib
   UefiDriverEntryPoint
   UefiLib
 [Protocols]
+  gTh1520MacConfigProtocolGuid
+  gEdkiiVariableLockProtocolGuid
+  gTh1520MacStoreProtocolGuid
+  gTh1520NvStoreReadyProtocolGuid
   gEfiSimpleNetworkProtocolGuid
   gEfiDevicePathProtocolGuid
   gFdtClientProtocolGuid
   gEfiCpuArchProtocolGuid
 [Guids]
+  gTh1520NvStoreGuid
   gFdtHobGuid
   gEfiEventExitBootServicesGuid
 [Depex]
-  gFdtClientProtocolGuid AND gEfiCpuArchProtocolGuid
+  gFdtClientProtocolGuid AND gEfiCpuArchProtocolGuid AND
+  gTh1520NvStoreReadyProtocolGuid
+
+[Pcd]
+  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc

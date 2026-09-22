@@ -107,17 +107,26 @@ edk2-reset-check:
 .PHONY: edk2-gmac-address-check
 edk2-gmac-address-check:
 	mkdir -p $(EDK2_BUILD)
-	$(CC) -g -fsanitize=address,undefined -ffunction-sections \
+	$(CC) -D_PCD_GET_MODE_BOOL_PcdFirmwareOnEmmc=0 \
+		-g -fsanitize=address,undefined -ffunction-sections \
 		-fdata-sections \
 		-Wl,--gc-sections -fshort-wchar \
 		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
 		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
 		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
 		-I$(EDK2_SOURCE)/CryptoPkg/Include \
+		-Iplatforms/Th1520Pkg/Include \
 		tests/edk2-gmac-address.c \
 		platforms/Th1520Pkg/Drivers/GmacDxe/Address.c \
+		platforms/Th1520Pkg/Library/MacStoreLib/Random.c \
 		-o $(EDK2_BUILD)/test-gmac-address
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-gmac-address
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-gmac-address saved
+	@for kind in zero broadcast multicast short long empty volatile; do \
+		ASAN_OPTIONS=detect_leaks=0 \
+			$(EDK2_BUILD)/test-gmac-address $$kind || exit $$?; \
+	done
 
 BOARD_LIB = platforms/Th1520Pkg/Library/BoardSupportLib
 FDT_SOURCES = $(BOARD_LIB)/Fdt.c $(BOARD_LIB)/Pinctrl.c
@@ -226,7 +235,8 @@ edk2-gmac-queue-check:
 		-fdata-sections -Wl,--gc-sections -fshort-wchar \
 		-I$(EDK2_SOURCE)/MdePkg/Include \
 		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
-		-I$(EDK2_SOURCE)/EmbeddedPkg/Include tests/edk2-gmac-queue.c \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+		-Iplatforms/Th1520Pkg/Include tests/edk2-gmac-queue.c \
 		-o $(EDK2_BUILD)/test-gmac-queue
 	$(EDK2_BUILD)/test-gmac-queue
 
@@ -272,6 +282,15 @@ edk2-dtb:
 		$(FIRMWARE_DTS) -o $(EDK2_BUILD)/firmware.dts
 	dtc -I dts -O dtb $(EDK2_BUILD)/firmware.dts \
 		-o $(EDK2_BUILD)/firmware.dtb
+
+.PHONY: edk2-gmac-policy-check
+check: edk2-gmac-policy-check
+edk2-gmac-policy-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) $(FDT_TEST_FLAGS) tests/edk2-gmac-policy.c \
+		platforms/Th1520Pkg/Library/MacStoreLib/MacStore.c \
+		-o $(EDK2_BUILD)/test-gmac-policy
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-gmac-policy
 
 .PHONY: edk2-mac-store-check
 check: edk2-mac-store-check
