@@ -50,6 +50,10 @@ Linux 只接收最终 MAC，没有用于修改持久 MAC 的专用接口。
 
 ## BIOS 设置
 
+启动等待时间在 `Boot Maintenance Manager → Auto Boot Time-out` 设置。
+用 F10 确认保存后，正常固件读取标准 `Timeout` 变量；仅在变量不存在
+时采用 10 秒默认值。RAM 恢复固件仍直接进入 Fastboot，不等待倒计时。
+
 进入 `F2 → Device Manager → Ethernet MAC Addresses`：
 
 - 勾选 `Use BIOS address` 后手动输入六个十六进制字节，用冒号分隔。

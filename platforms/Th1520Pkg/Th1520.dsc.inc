@@ -109,7 +109,8 @@
 !if $(RECOVERY_BUILD) == TRUE
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|0
 !else
-  gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|10
+[PcdsDynamicHii]
+  gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|L"Timeout"|gEfiGlobalVariableGuid|0x0|10
 !endif
 [Components]
   UefiCpuPkg/SecCore/SecCoreNative.inf {
