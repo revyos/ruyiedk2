@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = MacConfigDxe
+  FILE_GUID = 623937a4-1db3-4986-8ab5-a70d643a9ac1
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = MacConfigInitialize
+[Sources]
+  MacConfig.c
+  MacConfig.h
+  Forms.vfr
+  Strings.uni
+  Parse.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DevicePathLib
+  HiiLib
+  MemoryAllocationLib
+  PrintLib
+  Th1520MacStoreLib
+  UefiBootServicesTableLib
+  UefiHiiServicesLib
+  UefiRuntimeServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gTh1520MacConfigProtocolGuid
+  gEfiHiiConfigAccessProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gEfiHiiDatabaseProtocolGuid
+  gEfiHiiConfigRoutingProtocolGuid
+  gEfiHiiPopupProtocolGuid
+[Depex]
+  gTh1520MacConfigProtocolGuid AND gEfiHiiDatabaseProtocolGuid AND
+  gEfiHiiConfigRoutingProtocolGuid

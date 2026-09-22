@@ -339,3 +339,13 @@ edk2-nv-runtime-check:
 		platforms/Th1520Pkg/Library/NvStoreLib/Records.c \
 		-lz -o $(EDK2_BUILD)/test-nv-runtime
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-nv-runtime
+
+.PHONY: edk2-mac-parse-check
+check: edk2-mac-parse-check
+edk2-mac-parse-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) $(FDT_TEST_FLAGS) tests/edk2-mac-parse.c \
+		platforms/Th1520Pkg/Drivers/MacConfigDxe/Parse.c \
+		platforms/Th1520Pkg/Library/MacStoreLib/MacStore.c \
+		-o $(EDK2_BUILD)/test-mac-parse
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-mac-parse
