@@ -28,10 +28,13 @@ typedef struct
   EFI_PHYSICAL_ADDRESS Buffer;
   UINTN BufferSize;
   EFI_EVENT Refresh, Exit;
-  BOOLEAN Exited;
+  BOOLEAN Exited, Published, Online;
+  EFI_HANDLE Handle;
+  UINTN Polls;
 } DISPLAY;
 
 STATIC DISPLAY mDisplay;
+STATIC EFI_STATUS Probe (DISPLAY *D);
 
 STATIC VOID EFIAPI Log (CONST CHAR8 *Format, ...)
 {
@@ -177,6 +180,23 @@ STATIC EFI_STATUS EFIAPI Blt (EFI_GRAPHICS_OUTPUT_PROTOCOL *This,
 STATIC VOID EFIAPI Refresh (EFI_EVENT Event, VOID *Context)
 {
   DISPLAY *D = Context;
+  if (D->Exited)
+    return;
+  // Poll at 500 ms; DDC retries never run on every framebuffer flush.
+  if (++D->Polls == 5)
+  {
+    D->Polls = 0;
+    if (!DisplayConnected (&D->Hw))
+    {
+      if (D->Online)
+      {
+        DisplayDisable (&D->Hw);
+        D->Online = FALSE;
+      }
+    }
+    else if (!D->Online)
+      Probe (D);
+  }
   // GOP clients may write FrameBufferBase without calling Blt(). Bare-mode
   // C910 DDR is cacheable, so also publish such writes while boot services run.
   if (!D->Exited && D->Mode.Mode != MAX_UINT32)
@@ -221,65 +241,109 @@ STATIC EFI_STATUS FindDevice (FDT_CLIENT_PROTOCOL *Fdt, CONST CHAR8 *Compatible,
   return EFI_SUCCESS;
 }
 
-EFI_STATUS EFIAPI DisplayInitialize (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+STATIC EFI_STATUS
+Probe (DISPLAY *D)
+{
+  DISPLAY_HW Next = D->Hw;
+  EFI_STATUS Status;
+  if (D->Exited || !DisplayConnected (&D->Hw))
+    return EFI_NOT_FOUND;
+  Status = DisplayReadEdid (&Next);
+  if (EFI_ERROR (Status))
+    return Status;
+  DisplayParseEdid (&Next);
+  if (!Next.ModeCount)
+    return EFI_UNSUPPORTED;
+  if (D->Published && D->Mode.Mode < D->Hw.ModeCount &&
+      Next.ModeCount == D->Hw.ModeCount &&
+      !CompareMem (Next.Modes, D->Hw.Modes,
+                   Next.ModeCount * sizeof (Next.Modes[0])))
+  {
+    // Keep the console and framebuffer when the same sink reconnects.
+    D->Hw = Next;
+    Status = DisplaySetTiming (&D->Hw, D->Hw.Modes[D->Mode.Mode],
+                                D->Buffer);
+    D->Online = !EFI_ERROR (Status);
+    return Status;
+  }
+  if (D->Published)
+  {
+    // Release GraphicsConsole before replacing its cached mode catalogue.
+    Status = gBS->DisconnectController (D->Handle, NULL, NULL);
+    if (EFI_ERROR (Status))
+      return Status;
+  }
+  D->Hw = Next;
+  D->Mode.MaxMode = D->Hw.ModeCount;
+  D->Mode.Mode = MAX_UINT32;
+  Status = SetMode (&D->Gop, 0);
+  if (EFI_ERROR (Status))
+    return Status;
+  D->Discovered.SizeOfEdid = D->Hw.EdidSize;
+  D->Discovered.Edid = D->Hw.Edid;
+  D->Active.SizeOfEdid = D->Hw.EdidSize;
+  D->Active.Edid = D->Hw.Edid;
+  D->Online = TRUE;
+  if (D->Published)
+    Status = gBS->ReinstallProtocolInterface (D->Handle,
+        &gEfiGraphicsOutputProtocolGuid, &D->Gop, &D->Gop);
+  else
+    Status = gBS->InstallMultipleProtocolInterfaces (
+        &D->Handle, &gEfiDevicePathProtocolGuid, &mPath,
+        &gEfiGraphicsOutputProtocolGuid, &D->Gop,
+        &gEfiEdidDiscoveredProtocolGuid, &D->Discovered,
+        &gEfiEdidActiveProtocolGuid, &D->Active, NULL);
+  if (EFI_ERROR (Status))
+  {
+    D->Online = FALSE;
+    DisplayDisable (&D->Hw);
+    return Status;
+  }
+  D->Published = TRUE;
+  Log ("HDMI: connected, GOP %ux%u\r\n",
+       D->Info.HorizontalResolution, D->Info.VerticalResolution);
+  return EFI_SUCCESS;
+}
+
+EFI_STATUS EFIAPI
+DisplayInitialize (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
   DISPLAY *D = &mDisplay;
   FDT_CLIENT_PROTOCOL *Fdt;
-  EFI_HANDLE Handle = NULL;
   EFI_STATUS Status;
-  Status = gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL, (VOID **)&Fdt);
+  Status = gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL,
+                                (VOID **)&Fdt);
   if (EFI_ERROR (Status))
-  {
     return Status;
-  }
-  Status = FindDevice (Fdt, "thead,th1520-dc8200", 0xffef600000ULL, &D->Hw.Dc);
+  Status = FindDevice (Fdt, "thead,th1520-dc8200", 0xffef600000ULL,
+                       &D->Hw.Dc);
   if (EFI_ERROR (Status))
-  {
     return Status;
-  }
-  Status = FindDevice (Fdt, "thead,th1520-dw-hdmi", 0xffef540000ULL, &D->Hw.Hdmi);
+  Status = FindDevice (Fdt, "thead,th1520-dw-hdmi", 0xffef540000ULL,
+                       &D->Hw.Hdmi);
   if (EFI_ERROR (Status))
-  {
     return Status;
-  }
   Status = DisplayPrepare (&D->Hw);
-  if (EFI_ERROR (Status))
-  {
-    Log ("HDMI: controller/connection not ready: %r\r\n", Status);
+  if (EFI_ERROR (Status) && Status != EFI_NOT_FOUND)
     return Status;
-  }
-  Status = DisplayReadEdid (&D->Hw);
-  if (EFI_ERROR (Status))
-  {
-    Log ("HDMI: EDID read: %r\r\n", Status);
-  }
-  DisplayParseEdid (&D->Hw);
-  if (D->Hw.ModeCount == 0)
-  {
-    Log ("HDMI: no supported EDID mode; keeping serial console\r\n");
-    return EFI_UNSUPPORTED;
-  }
+  // Allocate once, also for headless boots. Keep scanout fixed.
   D->BufferSize = EFI_PAGES_TO_SIZE (EFI_SIZE_TO_PAGES (1920 * 1080 * 4));
   D->Buffer = MAX_UINT32;
   Status = gBS->AllocatePages (AllocateMaxAddress, EfiReservedMemoryType,
-                               EFI_SIZE_TO_PAGES (D->BufferSize), &D->Buffer);
+      EFI_SIZE_TO_PAGES (D->BufferSize), &D->Buffer);
   if (EFI_ERROR (Status))
-  {
     return Status;
-  }
   ModeInfo (&DisplayTimings[0], &D->Info);
-  Status = FrameBufferBltConfigure ((VOID *)(UINTN)D->Buffer, &D->Info, NULL, &D->BltSize);
+  Status = FrameBufferBltConfigure ((VOID *)(UINTN)D->Buffer,
+                                   &D->Info, NULL, &D->BltSize);
   if (Status != RETURN_BUFFER_TOO_SMALL)
-  {
     goto Fail;
-  }
   D->Blt = AllocatePool (D->BltSize);
   if (D->Blt == NULL)
   {
     Status = EFI_OUT_OF_RESOURCES;
     goto Fail;
   }
-  D->Mode.MaxMode = D->Hw.ModeCount;
   D->Mode.Mode = MAX_UINT32;
   D->Mode.Info = &D->Info;
   D->Mode.SizeOfInfo = sizeof (D->Info);
@@ -288,57 +352,28 @@ EFI_STATUS EFIAPI DisplayInitialize (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *S
   D->Gop.SetMode = SetMode;
   D->Gop.Blt = Blt;
   D->Gop.Mode = &D->Mode;
-  Status = SetMode (&D->Gop, 0);
-  if (EFI_ERROR (Status))
-  {
-    goto Fail;
-  }
-  Status =
-      gBS->CreateEvent (EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_CALLBACK, Refresh, D, &D->Refresh);
-  if (EFI_ERROR (Status))
-  {
-    goto Fail;
-  }
-  Status = gBS->SetTimer (D->Refresh, TimerPeriodic, 1000000); // 100 ms.
-  if (EFI_ERROR (Status))
-  {
-    goto Fail;
-  }
   Status = gBS->CreateEventEx (EVT_NOTIFY_SIGNAL, TPL_NOTIFY, Exit, D,
-                               &gEfiEventExitBootServicesGuid, &D->Exit);
+      &gEfiEventExitBootServicesGuid, &D->Exit);
   if (EFI_ERROR (Status))
-  {
     goto Fail;
-  }
-  D->Discovered.SizeOfEdid = D->Hw.EdidSize;
-  D->Discovered.Edid = D->Hw.Edid;
-  D->Active.SizeOfEdid = D->Hw.EdidSize;
-  D->Active.Edid = D->Hw.Edid;
-  Status = gBS->InstallMultipleProtocolInterfaces (
-      &Handle, &gEfiDevicePathProtocolGuid, &mPath, &gEfiGraphicsOutputProtocolGuid, &D->Gop,
-      &gEfiEdidDiscoveredProtocolGuid, &D->Discovered, &gEfiEdidActiveProtocolGuid, &D->Active,
-      NULL);
-  if (!EFI_ERROR (Status))
-  {
-    Log ("HDMI: DC8200 GOP %ux%u, framebuffer 0x%lx\r\n", D->Info.HorizontalResolution,
-         D->Info.VerticalResolution, D->Buffer);
-    return EFI_SUCCESS;
-  }
+  Status = gBS->CreateEvent (EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_CALLBACK,
+                            Refresh, D, &D->Refresh);
+  if (EFI_ERROR (Status))
+    goto Fail;
+  Status = gBS->SetTimer (D->Refresh, TimerPeriodic, 1000000);
+  if (EFI_ERROR (Status))
+    goto Fail;
+  // Missing HPD or a transient EDID failure is retried by Refresh.
+  Probe (D);
+  return EFI_SUCCESS;
 Fail:
   DisplayDisable (&D->Hw);
   if (D->Refresh != NULL)
-  {
     gBS->CloseEvent (D->Refresh);
-  }
   if (D->Exit != NULL)
-  {
     gBS->CloseEvent (D->Exit);
-  }
   if (D->Blt != NULL)
-  {
     FreePool (D->Blt);
-  }
   gBS->FreePages (D->Buffer, EFI_SIZE_TO_PAGES (D->BufferSize));
-  Log ("HDMI: GOP initialization failed: %r\r\n", Status);
   return Status;
 }

@@ -253,6 +253,19 @@ edk2-emmc-fdt-check:
 		-o $(EDK2_BUILD)/test-emmc-fdt
 	$(EDK2_BUILD)/test-emmc-fdt
 
+.PHONY: edk2-hotplug-check
+check: edk2-hotplug-check
+edk2-hotplug-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
+		-ffunction-sections -fdata-sections -Wl,--gc-sections \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+		tests/edk2-display-hotplug.c -o $(EDK2_BUILD)/test-hotplug
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-hotplug
+
 .PHONY: edk2-nvstore-check
 check: edk2-nvstore-check
 edk2-nvstore-check:

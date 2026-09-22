@@ -31,6 +31,7 @@ typedef struct
 extern CONST DISPLAY_TIMING DisplayTimings[DISPLAY_MAX_MODES];
 BOOLEAN DisplayEdidValid (CONST UINT8 *Data);
 VOID DisplayParseEdid (DISPLAY_HW *Hw);
+BOOLEAN DisplayConnected (DISPLAY_HW *Hw);
 EFI_STATUS DisplayPrepare (DISPLAY_HW *Hw);
 EFI_STATUS DisplayReadEdid (DISPLAY_HW *Hw);
 EFI_STATUS DisplaySetTiming (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *Timing,

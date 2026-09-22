@@ -70,6 +70,12 @@ VOID DisplayDisable (DISPLAY_HW *Hw)
   WriteHdmi (Hw, HDMI_MC_CLKDIS, 0x7f);
 }
 
+BOOLEAN
+DisplayConnected (DISPLAY_HW *Hw)
+{
+  return (ReadHdmi (Hw, HDMI_PHY_STAT0) & HDMI_PHY_HPD) != 0;
+}
+
 EFI_STATUS
 DisplayPrepare (DISPLAY_HW *Hw)
 {

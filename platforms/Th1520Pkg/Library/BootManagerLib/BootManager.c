@@ -55,6 +55,31 @@ STATIC VOID EFIAPI
 Notify (EFI_EVENT Event, VOID *Context)
 {
 }
+STATIC VOID *GraphicsRegistration;
+STATIC BOOLEAN ConsoleReady;
+
+STATIC VOID EFIAPI
+GraphicsAvailable (EFI_EVENT Event, VOID *Context)
+{
+  EFI_HANDLE Handle;
+  EFI_DEVICE_PATH_PROTOCOL *Path;
+  UINTN Size;
+  while (TRUE)
+  {
+    Size = sizeof (Handle);
+    if (EFI_ERROR (gBS->LocateHandle (ByRegisterNotify, NULL,
+        GraphicsRegistration, &Size, &Handle)))
+      break;
+    Path = DevicePathFromHandle (Handle);
+    if (Path == NULL)
+      continue;
+    EfiBootManagerUpdateConsoleVariable (ConOut, Path, NULL);
+    EfiBootManagerUpdateConsoleVariable (ErrOut, Path, NULL);
+    if (ConsoleReady)
+      EfiBootManagerConnectAllDefaultConsoles ();
+  }
+}
+
 VOID EFIAPI
 PlatformBootManagerBeforeConsole (VOID)
 {
@@ -69,8 +94,6 @@ PlatformBootManagerBeforeConsole (VOID)
   EFI_GUID BootMenu = {
       0xeec25bdc, 0x67f2, 0x4d95, {0xb1, 0xd5, 0xf8, 0x1b, 0x20, 0x39, 0xd1, 0x1d}};
   EFI_HANDLE Handle = NULL;
-  EFI_HANDLE *Graphics;
-  UINTN Count, Index;
   gBS->InstallProtocolInterface (&Handle, &gEdkiiPlatformHasDeviceTreeGuid, EFI_NATIVE_INTERFACE,
                                  NULL);
   if (!EFI_ERROR (EfiBootManagerGetBootManagerMenu (&Menu)))
@@ -96,20 +119,8 @@ PlatformBootManagerBeforeConsole (VOID)
   EfiBootManagerUpdateConsoleVariable (ConIn, (VOID *)&UsbKeyboard, NULL);
   EfiBootManagerUpdateConsoleVariable (ConOut, (VOID *)&Console, NULL);
   EfiBootManagerUpdateConsoleVariable (ErrOut, (VOID *)&Console, NULL);
-  if (!EFI_ERROR (gBS->LocateHandleBuffer (ByProtocol, &gEfiGraphicsOutputProtocolGuid,
-                                           NULL, &Count, &Graphics)))
-  {
-    for (Index = 0; Index < Count; Index++)
-    {
-      EFI_DEVICE_PATH_PROTOCOL *Path = DevicePathFromHandle (Graphics[Index]);
-      if (Path != NULL)
-      {
-        EfiBootManagerUpdateConsoleVariable (ConOut, Path, NULL);
-        EfiBootManagerUpdateConsoleVariable (ErrOut, Path, NULL);
-      }
-    }
-    FreePool (Graphics);
-  }
+  EfiCreateProtocolNotifyEvent (&gEfiGraphicsOutputProtocolGuid,
+      TPL_CALLBACK, GraphicsAvailable, NULL, &GraphicsRegistration);
   if (!EFI_ERROR (gBS->CreateEventEx (EVT_NOTIFY_SIGNAL, TPL_CALLBACK, Notify, NULL,
                                       &gEfiEndOfDxeEventGroupGuid, &Event)))
   {
@@ -263,6 +274,7 @@ PlatformBootManagerAfterConsole (VOID)
 {
   EFI_EVENT Event;
   STATIC CONST CHAR8 Keys[] = "F2: Setup    F9: USB Fastboot    F12: Boot Menu\r\n";
+  ConsoleReady = TRUE;
   EfiBootManagerConnectAll ();
   EfiBootManagerRefreshAllBootOption ();
   ReportNetworkAddress ();
