@@ -10,7 +10,6 @@ Th1520NvRecord (CONST VOID *Data, UINTN Length, UINTN Offset,
   CONST UINT8 *P = Data;
   if (!Data || !R || Offset > Length || Length - Offset < 30)
     return EFI_COMPROMISED_DATA;
-  R->Offset = Offset;
   R->NameSize = ReadUnaligned32 (P + Offset);
   if (R->NameSize < 4 || (R->NameSize & 1) ||
       R->NameSize > Length - Offset - 28)

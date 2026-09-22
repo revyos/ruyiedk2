@@ -13,6 +13,7 @@
 #include <Library/UefiRuntimeLib.h>
 #include <Library/UefiLib.h>
 #include <Protocol/Th1520MacStore.h>
+#include <Protocol/Th1520NvStore.h>
 #include <Protocol/VariableLock.h>
 
 typedef struct {
@@ -36,6 +37,13 @@ STATIC EFI_HANDLE DriverHandle;
 STATIC VOID *Registration;
 STATIC EFI_STATUS RuntimeStatus = EFI_SUCCESS;
 
+STATIC BOOLEAN
+PrivateMacVariable (CONST CHAR16 *Name, CONST EFI_GUID *Guid)
+{
+  return CompareGuid (Guid, &gTh1520NvStoreGuid) &&
+      (!StrCmp (Name, L"FallbackMac") || !StrCmp (Name, L"MacSettings"));
+}
+
 STATIC EFI_STATUS EFIAPI
 SetVariable (CHAR16 *Name, EFI_GUID *Guid, UINT32 Attributes,
              UINTN Size, VOID *Data)
@@ -47,9 +55,7 @@ SetVariable (CHAR16 *Name, EFI_GUID *Guid, UINT32 Attributes,
   EFI_TPL Tpl = TPL_APPLICATION;
   if (!Name || !Guid)
     return EFI_INVALID_PARAMETER;
-  if (Runtime && CompareGuid (Guid, &gTh1520NvStoreGuid) &&
-      (!StrCmp (Name, L"FallbackMac") ||
-       !StrCmp (Name, L"MacSettings")))
+  if (Runtime && PrivateMacVariable (Name, Guid))
     return EFI_WRITE_PROTECTED;
   // A failed conversion can leave even Nv itself inaccessible to the OS.
   if (Runtime && EFI_ERROR (RuntimeStatus))
@@ -119,9 +125,7 @@ Replay (VOID)
     CopyMem (&Guid, R.Guid, sizeof (Guid));
     CopyMem (Nv->Name, R.Name, R.NameSize);
     // Migrate the prototype's runtime-visible MAC without a delete window.
-    if (CompareGuid (&Guid, &gTh1520NvStoreGuid) &&
-        (!StrCmp (Nv->Name, L"FallbackMac") ||
-         !StrCmp (Nv->Name, L"MacSettings")))
+    if (PrivateMacVariable (Nv->Name, &Guid))
       R.Attributes = EFI_VARIABLE_NON_VOLATILE |
                      EFI_VARIABLE_BOOTSERVICE_ACCESS;
     Status = OriginalSet (Nv->Name, &Guid, R.Attributes,
@@ -158,8 +162,7 @@ Snapshot (VOID)
   {
     UINTN NameSize = sizeof (Nv->Name), Size = sizeof (Nv->Value);
     UINT32 Attributes;
-    EFI_STATUS Status = OriginalNext (&NameSize, Nv->Name,
-                                                 &Guid);
+    EFI_STATUS Status = OriginalNext (&NameSize, Nv->Name, &Guid);
     if (Status == EFI_NOT_FOUND)
       break;
     if (EFI_ERROR (Status))

@@ -10,5 +10,3 @@ struct _TH1520_MAC_STORE_PROTOCOL {
   EFI_STATUS (EFIAPI *SetSettings)(CONST TH1520_MAC_SETTINGS *Settings);
 };
 extern EFI_GUID gTh1520MacStoreProtocolGuid;
-extern EFI_GUID gTh1520NvStoreReadyProtocolGuid;
-extern EFI_GUID gTh1520NvStoreGuid;

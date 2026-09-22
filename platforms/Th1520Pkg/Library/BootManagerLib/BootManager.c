@@ -9,6 +9,7 @@
 #include <Protocol/LoadedImage.h>
 #include <Protocol/FdtClient.h>
 #include <Protocol/Th1520MacStore.h>
+#include <Protocol/Th1520NvStore.h>
 #include <Library/Th1520MacStoreLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Protocol/GraphicsOutput.h>

@@ -32,7 +32,7 @@ typedef struct {
 // OVMF SerializeVariablesLib format: name size, UTF-16 name, GUID,
 // attributes, data size, data; packed, with no inter-record alignment.
 typedef struct {
-  UINTN Offset, Size, NameSize, DataSize;
+  UINTN Size, NameSize, DataSize;
   CONST VOID *Name, *Guid, *Data;
   UINT32 Attributes;
 } TH1520_NV_RECORD;

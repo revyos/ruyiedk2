@@ -5,6 +5,7 @@
 #include <Library/Th1520MacStoreLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Protocol/Th1520MacStore.h>
+#include <Protocol/Th1520NvStore.h>
 #include <Protocol/VariableLock.h>
 
 #define EFUSE_BASE 0xffff210000ULL
