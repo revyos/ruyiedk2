@@ -243,6 +243,19 @@ edk2-emmc-fdt-check:
 		-o $(EDK2_BUILD)/test-emmc-fdt
 	$(EDK2_BUILD)/test-emmc-fdt
 
+.PHONY: edk2-nvstore-check
+check: edk2-nvstore-check
+edk2-nvstore-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-Iplatforms/Th1520Pkg/Include tests/edk2-nvstore.c \
+		platforms/Th1520Pkg/Library/NvStoreLib/Journal.c \
+		platforms/Th1520Pkg/Library/NvStoreLib/Records.c \
+		-lz -o $(EDK2_BUILD)/test-nvstore
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-nvstore
+
 .PHONY: edk2-spi-runtime-check
 check: edk2-spi-runtime-check
 edk2-spi-runtime-check:

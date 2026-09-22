@@ -32,6 +32,7 @@
 [BuildOptions.common.EDKII.DXE_RUNTIME_DRIVER]
   GCC:*_*_*_DLINK_FLAGS = -z common-page-size=0x1000
 [LibraryClasses.common]
+  Th1520NvStoreLib|Th1520Pkg/Library/NvStoreLib/NvStoreLib.inf
   Th1520SpiLib|Th1520Pkg/Library/SpiLib/SpiLib.inf
   BootLogoLib|MdeModulePkg/Library/BootLogoLib/BootLogoLib.inf
   FrameBufferBltLib|MdeModulePkg/Library/FrameBufferBltLib/FrameBufferBltLib.inf

@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Th1520NvStoreLib
+  FILE_GUID = 3f17c6bf-32aa-4ce5-a981-1f252cda1d8b
+  MODULE_TYPE = BASE
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = Th1520NvStoreLib
+[Sources]
+  Journal.c
+  Records.c
+[Packages]
+  MdePkg/MdePkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
