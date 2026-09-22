@@ -19,7 +19,7 @@ BOOLEAN
 Th1520MacValid (CONST UINT8 *Mac)
 {
   STATIC CONST UINT8 Zero[6];
-  return Mac && !(Mac[0] & 1) && CompareMem (Mac, Zero, 6);
+  return Mac && !(Mac[0] & 1) && CompareMem (Mac, Zero, 6) != 0;
 }
 
 BOOLEAN
@@ -188,14 +188,13 @@ Th1520MacWriteSettings (TH1520_MAC_READ Read, TH1520_MAC_WRITE Write,
 EFI_STATUS
 Th1520MacAdjacent (CONST UINT8 *Base, UINT8 *Mac)
 {
-  if (!Base || !Mac || (Base[0] & 1) ||
-      !CompareMem (Base, (UINT8[6]){0}, 6))
+  if (!Mac || !Th1520MacValid (Base))
     return EFI_INVALID_PARAMETER;
   CopyMem (Mac, Base, 6);
   for (INTN I = 5; I >= 0; I--)
     if (++Mac[I])
       break;
-  if (((Mac[0] & 1) || !CompareMem (Mac, (UINT8[6]){0}, 6)))
+  if (!Th1520MacValid (Mac))
   {
     // Carry into the first octet must not turn a unicast into multicast.
     CopyMem (Mac, Base, 6);

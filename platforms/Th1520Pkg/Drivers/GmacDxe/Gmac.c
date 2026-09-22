@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 // Per-controller, polled DWMAC 3.70a SNP instances discovered from the DTB.
 #include "Gmac.h"
+#include <Library/Th1520MacStoreLib.h>
 #include <Guid/EventGroup.h>
 #include <Protocol/DevicePath.h>
 #include <Protocol/FdtClient.h>
@@ -81,12 +82,6 @@ LockInitialized (EFI_SIMPLE_NETWORK_PROTOCOL *This)
   }
   EfiReleaseLock (&Nic->Lock);
   return Nic->Mode.State == EfiSimpleNetworkStopped ? EFI_NOT_STARTED : EFI_DEVICE_ERROR;
-}
-STATIC BOOLEAN
-ValidMac (CONST UINT8 *Mac)
-{
-  STATIC CONST UINT8 Zero[6];
-  return !(Mac[0] & 1) && CompareMem (Mac, Zero, 6) != 0;
 }
 STATIC BOOLEAN
 Broadcast (CONST UINT8 *Mac)
@@ -544,7 +539,7 @@ StationAddress (EFI_SIMPLE_NETWORK_PROTOCOL *This, BOOLEAN Restore, EFI_MAC_ADDR
   {
     CopyMem (&Nic->Mode.CurrentAddress, &Nic->Mode.PermanentAddress, sizeof (EFI_MAC_ADDRESS));
   }
-  else if (!Address || !ValidMac (Address->Addr))
+  else if (!Address || !Th1520MacValid (Address->Addr))
   {
     Status = EFI_INVALID_PARAMETER;
     goto Done;

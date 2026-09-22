@@ -12,13 +12,6 @@ typedef struct {
 STATIC MAC_CHOICE Choices[2];
 STATIC BOOLEAN Prepared;
 
-STATIC BOOLEAN
-Valid (CONST UINT8 *Mac)
-{
-  STATIC CONST UINT8 Zero[6];
-  return !(Mac[0] & 1) && CompareMem (Mac, Zero, 6);
-}
-
 STATIC INT32
 Find (FDT_CLIENT_PROTOCOL *Fdt, UINTN Index)
 {
@@ -50,7 +43,7 @@ DtAddress (FDT_CLIENT_PROTOCOL *Fdt, INT32 Node, UINT8 *Mac)
   for (UINTN I = 0; I < ARRAY_SIZE (Names); I++)
     if (!EFI_ERROR (Fdt->GetNodeProperty (
         Fdt, Node, Names[I], &P, &Size)) &&
-        Size == 6 && Valid (P))
+        Size == 6 && Th1520MacValid (P))
     {
       CopyMem (Mac, P, 6);
       return TRUE;
@@ -78,12 +71,12 @@ GmacPrepareAddresses (FDT_CLIENT_PROTOCOL *Fdt)
       continue;
     C->DtValid = DtAddress (Fdt, Node, C->Dt);
     C->OverrideValid = (Settings.OverrideMask & (1U << I)) &&
-        Valid (Settings.Address[I]);
+        Th1520MacValid (Settings.Address[I]);
     CopyMem (C->Override, Settings.Address[I], 6);
     if (C->DtValid || C->OverrideValid)
       continue;
     EFI_STATUS Status = GmacReadFactoryAddress (&Hw, C->Fuse);
-    C->FuseValid = !EFI_ERROR (Status) && Valid (C->Fuse);
+    C->FuseValid = !EFI_ERROR (Status) && Th1520MacValid (C->Fuse);
     C->Reason = EFI_ERROR (Status) ? "unavailable" :
         !CompareMem (C->Fuse, Zero, 6) ? "empty" : "invalid";
   }
@@ -159,8 +152,7 @@ GmacPrepareAddresses (FDT_CLIENT_PROTOCOL *Fdt)
       C->Status = EFI_NOT_FOUND;
       continue;
     }
-    if (!C->DtValid && !C->OverrideValid && (!C->FuseValid ||
-        CompareMem (C->Fuse, C->Mac, 6)))
+    if (C->Source == Th1520MacFallback)
       C->Status = Fdt->SetNodeProperty (Fdt, Node,
           "thead,random-mac-reason", C->Reason,
           (UINT32)AsciiStrSize (C->Reason));
