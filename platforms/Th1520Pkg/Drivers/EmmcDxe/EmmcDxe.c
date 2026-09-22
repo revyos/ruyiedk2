@@ -469,9 +469,8 @@ Initialize (VOID)
   Media.BlockSize = 512;
   Media.IoAlign = 1;
   UserAreaSelected = TRUE;
-  Print (L"TH1520 eMMC: %u kHz, %u-bit %s\n", BusRate / 1000,
-         BusWidth,
-         DmaEnabled ? L"ADMA2" : L"PIO");
+  DEBUG ((DEBUG_INFO, "TH1520 eMMC: %u kHz, %u-bit %a\n",
+          BusRate / 1000, BusWidth, DmaEnabled ? "ADMA2" : "PIO"));
   return EFI_SUCCESS;
 }
 STATIC EFI_STATUS EFIAPI
