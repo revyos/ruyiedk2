@@ -47,3 +47,4 @@
 [Pcd]
   gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile
