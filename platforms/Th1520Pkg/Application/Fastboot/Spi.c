@@ -1,262 +1,35 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "Fastboot.h"
+#include <Library/Th1520SpiLib.h>
 #include <Library/PrintLib.h>
-#define SPI 0xffea000000ULL
-#define GPIO 0xffe7f34000ULL
-#define PAD 0xffec007000ULL
-#define FLASH_SIZE SIZE_8MB
-STATIC UINT32 FrameSize, FifoDepth;
-STATIC VOID
-ChipSelect (BOOLEAN High)
-{
-  if (High)
-  {
-    MmioOr32 (GPIO, BIT3);
-  }
-  else
-  {
-    MmioAnd32 (GPIO, ~BIT3);
-  }
-}
-STATIC EFI_STATUS
-Exchange (CONST UINT8 *Tx, UINT8 *Rx, UINTN Size)
-{
-  UINTN Sent = 0, Received = 0, Count, Before, N;
-  UINT64 Progress;
-  UINT8 Value;
-  MmioWrite32 (SPI + 8, 0);
-  MmioWrite32 (SPI, FrameSize);
-  MmioWrite32 (SPI + 0x10, 1);
-  MmioWrite32 (SPI + 8, 1);
-  ChipSelect (FALSE);
-  Progress = GetPerformanceCounter ();
-  while (Received < Size)
-  {
-    Before = Received;
-    // Include frames still in TX when reserving RX FIFO capacity.
-    Count = MIN (Size - Sent, FifoDepth - (Sent - Received));
-    while (Count--)
-    {
-      MmioWrite32 (SPI + 0x60, Tx ? Tx[Sent] : 0xff);
-      Sent++;
-    }
-    Count = MIN (MmioRead32 (SPI + 0x24), Sent - Received);
-    while (Count--)
-    {
-      Value = (UINT8)MmioRead32 (SPI + 0x60);
-      if (Rx)
-      {
-        Rx[Received] = Value;
-      }
-      Received++;
-    }
-    if (Received != Before)
-    {
-      Progress = GetPerformanceCounter ();
-    }
-    else if (GetTimeInNanoSecond (GetPerformanceCounter () - Progress) >
-             100000000)
-    {
-      ChipSelect (TRUE);
-      MmioWrite32 (SPI + 8, 0);
-      return EFI_TIMEOUT;
-    }
-  }
-  for (N = 0; N < 10000; N++)
-  {
-    if (!(MmioRead32 (SPI + 0x28) & BIT0))
-    {
-      break;
-    }
-    MicroSecondDelay (1);
-  }
-  ChipSelect (TRUE);
-  MmioWrite32 (SPI + 8, 0);
-  return N == 10000 ? EFI_TIMEOUT : EFI_SUCCESS;
-}
-STATIC EFI_STATUS
-Ready (VOID)
-{
-  UINT8 Tx[2] = {5, 0}, Rx[2];
-  UINTN N;
-  EFI_STATUS Status;
-  for (N = 0; N < 5000; N++)
-  {
-    Status = Exchange (Tx, Rx, 2);
-    if (EFI_ERROR (Status))
-    {
-      return Status;
-    }
-    if (!(Rx[1] & 1))
-    {
-      return EFI_SUCCESS;
-    }
-    MicroSecondDelay (1000);
-  }
-  return EFI_TIMEOUT;
-}
-STATIC EFI_STATUS
-WriteEnable (VOID)
-{
-  UINT8 Cmd = 6, Tx[2] = {5, 0}, Rx[2];
-  EFI_STATUS Status;
-  Status = Exchange (&Cmd, NULL, 1);
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  Status = Exchange (Tx, Rx, 2);
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  return (Rx[1] & 2) ? EFI_SUCCESS : EFI_WRITE_PROTECTED;
-}
-STATIC VOID
-AddressCommand (UINT8 *Cmd, UINT8 Op, UINTN Address)
-{
-  Cmd[0] = Op;
-  Cmd[1] = Address >> 16;
-  Cmd[2] = Address >> 8;
-  Cmd[3] = Address;
-}
+
 EFI_STATUS
 SpiFlash (CONST VOID *Buffer, UINTN Length)
 {
-  UINT8 Cmd[260], Readback[260], Id[4], Probe[4] = {0x9f, 0, 0, 0};
-  UINTN Offset, Count, Pin, Shift, Reg;
   EFI_STATUS Status;
+  EFI_TPL Previous;
   CHAR8 Progress[64];
-  UINT32 Pll, Cfg, Div, Divider;
-  UINT64 Rate;
-  if (Length == 0 || Length > FLASH_SIZE)
-  {
+  if (!Buffer || !Length || Length > SIZE_8MB - SIZE_256KB)
     return EFI_BAD_BUFFER_SIZE;
-  }
-  MmioOr32 (0xffef010204ULL, BIT17 | BIT6);
-  ChipSelect (TRUE);
-  MmioOr32 (GPIO + 4, BIT3);
-  for (Pin = 2; Pin <= 8; Pin++)
+  // Serialize access with variable writes and other DXE callbacks.
+  Previous = gBS->RaiseTPL (TPL_NOTIFY);
+  Status = Th1520SpiInit ();
+  for (UINTN Offset = 0; !EFI_ERROR (Status) && Offset < Length;
+       Offset += SIZE_4KB)
   {
-    if (Pin == 4)
+    if (!(Offset & 0xffff))
     {
-      continue; // PWM2 cooling fan shares QSPI CS1.
-    }
-    Reg = PAD + 0x400 + 4 * (Pin / 8);
-    Shift = 4 * (Pin % 8);
-    MmioAndThenOr32 (Reg, ~(15U << Shift), Pin == 3 ? 3U << Shift : 0);
-    Reg = PAD + 4 * (Pin / 2);
-    Shift = 16 * (Pin % 2);
-    MmioAndThenOr32 (Reg, ~(0x3ffU << Shift), (Pin == 3 ? 4U : 0x204U) << Shift);
-  }
-  MmioWrite32 (SPI + 8, 0);
-  MmioWrite32 (SPI, 0xffffffff);
-  FrameSize = (MmioRead32 (SPI) & 15) ? 7 : 7U << 16;
-  // Read the QSPI parent rate without changing the shared VIDEO_PLL.
-  Pll = MmioRead32 (0xffef010030ULL);
-  Cfg = MmioRead32 (0xffef010034ULL);
-  Div = (Pll & 63) * ((Pll >> 20) & 7) * ((Pll >> 24) & 7);
-  if (!Div)
-  {
-    return EFI_DEVICE_ERROR;
-  }
-  Rate = LShiftU64 ((Pll >> 8) & 4095, 24);
-  if (!(Cfg & BIT24))
-  {
-    Rate += Cfg & 0xffffff;
-  }
-  Rate = (Cfg & BIT30) ? 24000000 :
-      DivU64x32 (RShiftU64 (MultU64x32 (Rate, 24000000), 24), Div);
-  Divider = (UINT32)DivU64x32 (Rate + 9999999, 10000000);
-  Divider = (MAX (Divider, 2) + 1) & ~1U;
-  if (Divider > 65534)
-  {
-    return EFI_UNSUPPORTED;
-  }
-  MmioWrite32 (SPI + 0x14, Divider);
-  for (FifoDepth = 1; FifoDepth < 256; FifoDepth++)
-  {
-    MmioWrite32 (SPI + 0x18, FifoDepth);
-    if (MmioRead32 (SPI + 0x18) != FifoDepth)
-    {
-      break;
-    }
-  }
-  MmioWrite32 (SPI + 0x18, 0);
-  MmioWrite32 (SPI + 0x2c, 0);
-  Status = Exchange (Probe, Id, sizeof (Id));
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  if (Id[1] != 0xef || (Id[2] != 0x60 && Id[2] != 0x80) || Id[3] != 0x17)
-  {
-    return EFI_UNSUPPORTED;
-  }
-  Status = Ready ();
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  for (Offset = 0; Offset < ALIGN_VALUE (Length, SIZE_4KB); Offset += SIZE_4KB)
-  {
-    if ((Offset & 0xffff) == 0)
-    {
-      AsciiSPrint (Progress, sizeof (Progress), "INFOWriting SPI 0x%08x", (UINT32)Offset);
+      AsciiSPrint (Progress, sizeof (Progress),
+                   "INFOWriting SPI 0x%08x", (UINT32)Offset);
       Status = UsbSend (Progress, AsciiStrLen (Progress));
       if (EFI_ERROR (Status))
-      {
-        return Status;
-      }
+        break;
     }
-    Status = WriteEnable ();
-    if (EFI_ERROR (Status))
-    {
-      return Status;
-    }
-    AddressCommand (Cmd, 0x20, Offset);
-    Status = Exchange (Cmd, NULL, 4);
-    if (EFI_ERROR (Status))
-    {
-      return Status;
-    }
-    Status = Ready ();
-    if (EFI_ERROR (Status))
-    {
-      return Status;
-    }
-    for (Count = Offset; Count < MIN (Offset + SIZE_4KB, Length); Count += 256)
-    {
-      UINTN Bytes = MIN (256, Length - Count);
-      Status = WriteEnable ();
-      if (EFI_ERROR (Status))
-      {
-        return Status;
-      }
-      AddressCommand (Cmd, 2, Count);
-      CopyMem (Cmd + 4, (CONST UINT8 *)Buffer + Count, Bytes);
-      Status = Exchange (Cmd, NULL, 4 + Bytes);
-      if (EFI_ERROR (Status))
-      {
-        return Status;
-      }
-      Status = Ready ();
-      if (EFI_ERROR (Status))
-      {
-        return Status;
-      }
-      AddressCommand (Cmd, 3, Count);
-      SetMem (Cmd + 4, Bytes, 0xff);
-      Status = Exchange (Cmd, Readback, 4 + Bytes);
-      if (EFI_ERROR (Status))
-      {
-        return Status;
-      }
-      if (CompareMem (Readback + 4, (CONST UINT8 *)Buffer + Count, Bytes))
-      {
-        return EFI_CRC_ERROR;
-      }
-    }
+    Status = Th1520SpiErase (Offset, SIZE_4KB);
+    if (!EFI_ERROR (Status))
+      Status = Th1520SpiProgram (Offset, MIN (SIZE_4KB, Length - Offset),
+                                 (CONST UINT8 *)Buffer + Offset);
   }
-  return EFI_SUCCESS;
+  gBS->RestoreTPL (Previous);
+  return Status;
 }

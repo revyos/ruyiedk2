@@ -242,3 +242,15 @@ edk2-emmc-fdt-check:
 		-Iplatforms/Th1520Pkg/Include tests/edk2-emmc-fdt.c \
 		-o $(EDK2_BUILD)/test-emmc-fdt
 	$(EDK2_BUILD)/test-emmc-fdt
+
+.PHONY: edk2-spi-runtime-check
+check: edk2-spi-runtime-check
+edk2-spi-runtime-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
+		-ffunction-sections -fdata-sections -Wl,--gc-sections \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-Iplatforms/Th1520Pkg/Include tests/edk2-spi-runtime.c \
+		-o $(EDK2_BUILD)/test-spi-runtime
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-spi-runtime

@@ -20,6 +20,7 @@
   CryptoPkg/CryptoPkg.dec
   Th1520Pkg/Th1520Pkg.dec
 [LibraryClasses]
+  Th1520SpiLib
   PcdLib
   Th1520BoardLib
   BaseLib
