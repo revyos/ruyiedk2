@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+&{/soc} {
+	firmware_qspi: spi@ffea000000 {
+		compatible = "thead,th1520-spi", "snps,dw-apb-ssi";
+		reg = <0xff 0xea000000 0x0 0x1000>;
+		interrupts = <52 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&clk CLK_QSPI0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "disabled";
+	};
+};

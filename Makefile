@@ -256,6 +256,23 @@ edk2-nvstore-check:
 		-lz -o $(EDK2_BUILD)/test-nvstore
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-nvstore
 
+KERNEL_SOURCE ?= $(abspath ../linux-mainline)
+DTS_DIR = $(KERNEL_SOURCE)/arch/riscv/boot/dts/thead
+ifeq ($(EDK2_BOARD),lpi4a)
+FIRMWARE_DTS = $(DTS_DIR)/th1520-lichee-pi-4a.dts
+else
+FIRMWARE_DTS = platforms/MelesPkg/Firmware.dts
+endif
+.PHONY: edk2-dtb
+edk2-dtb:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -E -P -x assembler-with-cpp -nostdinc -undef -D__DTS__ \
+		-I$(KERNEL_SOURCE)/include \
+		-I$(KERNEL_SOURCE)/arch/riscv/boot/dts/thead \
+		$(FIRMWARE_DTS) -o $(EDK2_BUILD)/firmware.dts
+	dtc -I dts -O dtb $(EDK2_BUILD)/firmware.dts \
+		-o $(EDK2_BUILD)/firmware.dtb
+
 .PHONY: edk2-mac-store-check
 check: edk2-mac-store-check
 edk2-mac-store-check:
@@ -279,3 +296,14 @@ edk2-spi-runtime-check:
 		-Iplatforms/Th1520Pkg/Include tests/edk2-spi-runtime.c \
 		-o $(EDK2_BUILD)/test-spi-runtime
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-spi-runtime
+
+.PHONY: edk2-nv-runtime-check
+check: edk2-nv-runtime-check
+edk2-nv-runtime-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) $(FDT_TEST_FLAGS) \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include tests/edk2-nv-runtime.c \
+		platforms/Th1520Pkg/Library/NvStoreLib/Journal.c \
+		platforms/Th1520Pkg/Library/NvStoreLib/Records.c \
+		-lz -o $(EDK2_BUILD)/test-nv-runtime
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-nv-runtime

@@ -81,6 +81,7 @@ INF MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
 INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
 INF MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
 INF Th1520Pkg/Drivers/UsbHostDxe/UsbHostDxe.inf
+INF Th1520Pkg/Drivers/NvStoreDxe/NvStoreDxe.inf
 INF Th1520Pkg/Drivers/GmacDxe/GmacDxe.inf
 INF Th1520Pkg/Drivers/DisplayDxe/DisplayDxe.inf
 INF Th1520Pkg/Drivers/LogoDxe/LogoDxe.inf

@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Th1520NvStoreDxe
+  FILE_GUID = 477e0804-e6bf-4a03-b357-5f40a5dfe28e
+  MODULE_TYPE = DXE_RUNTIME_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = NvStoreInitialize
+[Sources]
+  NvStore.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  DxeServicesTableLib
+  BaseLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  PcdLib
+  Th1520NvStoreLib
+  Th1520SpiLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiRuntimeServicesTableLib
+  UefiRuntimeLib
+  UefiLib
+[Protocols]
+  gEdkiiVariableLockProtocolGuid
+  gTh1520MacStoreProtocolGuid
+  gTh1520NvStoreReadyProtocolGuid
+  gEfiCpuArchProtocolGuid
+  gEfiVariableArchProtocolGuid
+  gEfiVariableWriteArchProtocolGuid
+[Guids]
+  gTh1520NvStoreGuid
+  gEfiEventExitBootServicesGuid
+  gEfiEventVirtualAddressChangeGuid
+[Pcd]
+  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
+[Depex]
+  gEfiCpuArchProtocolGuid AND gEfiVariableArchProtocolGuid AND
+  gEfiVariableWriteArchProtocolGuid
