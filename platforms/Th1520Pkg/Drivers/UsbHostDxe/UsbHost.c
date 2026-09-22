@@ -31,7 +31,9 @@ StartHost (VOID)
   EFI_STATUS Status = Th1520BoardUsbRole (FALSE);
   if (EFI_ERROR (Status))
     return Status;
-  MmioOr32 (0xfffc02d104ULL, 15);
+  // Normal-world MISCSYS bus and USB gates, through the APB window.
+  MmioOr32 (0xffec02c100ULL, BIT0);
+  MmioOr32 (0xffec02c104ULL, 15);
   MmioWrite32 (0xfffc02e0c0ULL, MAX_UINT32);
   MmioOr32 (0xffec03f034ULL, 1);
   MicroSecondDelay (10);

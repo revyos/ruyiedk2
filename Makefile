@@ -349,3 +349,12 @@ edk2-mac-parse-check:
 		platforms/Th1520Pkg/Library/MacStoreLib/MacStore.c \
 		-o $(EDK2_BUILD)/test-mac-parse
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-mac-parse
+
+.PHONY: edk2-usb-start-check
+check: edk2-usb-start-check
+edk2-usb-start-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) $(FDT_TEST_FLAGS) \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include tests/edk2-usb-start.c \
+		-o $(EDK2_BUILD)/test-usb-start
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-usb-start

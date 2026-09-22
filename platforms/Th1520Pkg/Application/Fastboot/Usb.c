@@ -441,7 +441,9 @@ UsbStart (VOID)
   Generation = 0;
   SeenGeneration = 0;
   ZeroMem (Resource, sizeof (Resource));
-  MmioOr32 (0xfffc02d104ULL, 15);
+  // Normal-world MISCSYS bus and USB gates, through the APB window.
+  MmioOr32 (0xffec02c100ULL, BIT0);
+  MmioOr32 (0xffec02c104ULL, 15);
   MmioWrite32 (0xfffc02e0c0ULL, MAX_UINT32); // USB DMA access to initialized DDR.
   MmioOr32 (0xffec03f034ULL, 1);
   MicroSecondDelay (10);
