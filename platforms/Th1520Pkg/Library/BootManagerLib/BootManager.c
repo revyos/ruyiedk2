@@ -361,14 +361,19 @@ PlatformBootManagerWaitCallback (UINT16 Remaining)
   EFI_GRAPHICS_OUTPUT_BLT_PIXEL Blue = {0xdd, 0x63, 0x3e, 0};
   CHAR16 Title[80];
   CHAR8 Serial[64];
-  UINTN Progress, Size;
+  UINTN Progress, Size, SecondsWidth = 1;
   if (mBootTimeout == 0)
   {
     return;
   }
   Progress = (mBootTimeout - MIN (Remaining, mBootTimeout)) * 100U / mBootTimeout;
+  // BootLogoUpdateProgress centers each title without erasing the old one.
+  // Keep its width fixed when the countdown loses a decimal digit.
+  for (UINTN Timeout = mBootTimeout; Timeout >= 10; Timeout /= 10)
+    SecondsWidth++;
   UnicodeSPrint (Title, sizeof (Title),
-                 L"F2: Setup  F9: Fastboot  F12: Boot Menu  (%us)", Remaining);
+      L"F2: Setup  F9: Fastboot  F12: Boot Menu  (%*us)",
+      SecondsWidth, Remaining);
   if (mGraphicsProgress)
   {
     BootLogoUpdateProgress (White, Black, Title, Blue, Progress, mProgress);

@@ -188,3 +188,16 @@ visible. The normal unattended timeout was verified to boot Linux.
 Firmware does not force Linux clock frequencies at handoff. DC8200 is
 reinitialized by its native driver. The display PLL reference, feedback,
 postdividers and fractional-mode bits are preserved across GOP modes.
+
+## Countdown title redraw
+
+The countdown uses a fixed-width seconds field based on the configured
+boot timeout. BootLogoLib centers each title independently and only
+clears the progress area on its first update. An unpadded countdown
+therefore shifts the title by half a character when 10 becomes 9,
+leaving part of the old F beside F2.
+
+On 2026-09-25, Meles HDMI captures reproduced the doubled F and verified
+that the padded title stays in place through the countdown. SPI write
+and readback passed; Meles and LPi4A builds passed. Display timings and
+PLL programming were unchanged.
