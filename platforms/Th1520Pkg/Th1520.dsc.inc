@@ -158,6 +158,7 @@
   MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
   MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
   MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
+  MdeModulePkg/Bus/Usb/UsbMouseDxe/UsbMouseDxe.inf
   Th1520Pkg/Drivers/UsbHostDxe/UsbHostDxe.inf
   Th1520Pkg/Drivers/NvStoreDxe/NvStoreDxe.inf
   Th1520Pkg/Drivers/GmacDxe/GmacDxe.inf
