@@ -1,7 +1,10 @@
 # RAM recovery profile
 
 `make edk2-recovery` builds `build/meles-recovery/TH1520.fd`.
-This is a minimal Meles EDK2 firmware volume for an external RAM loader.
+`make edk2-lpi4a-recovery` builds
+`build/lpi4a-recovery/TH1520.fd`. Each board has its own product
+identity, board support library and device tree. These are minimal
+EDK2 firmware volumes for an external RAM loader.
 It keeps serial console, eMMC and USB device Fastboot, and starts the
 embedded Fastboot application through BDS without a boot menu timeout.
 The regular Meles and LPi4A profiles keep their normal boot policy.
@@ -11,8 +14,10 @@ entry with a valid DTB in a1 and a working OpenSBI runtime. Temporary
 memory occupies `0x82000000` through `0x84000000`. A loader may compress
 the FD to fit the BootROM download limit, then expand it into DDR.
 The sibling coreboot tree has `util/thead/build-recovery.py` for this
-purpose; neither a U-Boot runtime nor its Fastboot implementation is
-part of this recovery path.
+purpose. Pass `--board meles` or `--board lpi4a` and the matching FD and
+DTB. The resulting RAM images are separate and must not be exchanged
+between boards. Neither a U-Boot runtime nor its Fastboot implementation
+is part of this recovery path.
 
 ## Fastboot targets
 
@@ -63,7 +68,15 @@ The image is 1 MiB, below the 1152 KiB BootROM download limit. OpenSBI
 uses its original relocatable dynamic binary; boot harts 1 and 2 were
 observed without a hart-0 policy.
 
-The recovery service reported 8 MiB SPI and 4 MiB per eMMC boot area.
+LPi4A 8 GiB hardware also completed BootROM RAM download, DDR training,
+address-map adjustment, AON voltage verification, OpenSBI and EDK2
+Fastboot. It enumerated as `lpi4a-recovery`. Read-only capacity queries
+for `emmcboot0`, `emmcboot1` and `spi` succeeded. Use the coreboot
+normal eMMC profile to build the LPi4A boot0 image. Meles normal
+firmware uses the coreboot SPI profile. Both paths hand off through
+OpenSBI to the corresponding normal EDK2 volume.
+
+The Meles recovery service reported 8 MiB SPI and 4 MiB per eMMC boot area.
 It rejected a sparse input before writing. A 1 MiB image was written to
 SPI, boot0 and boot1, with each writer's readback comparison passing.
 The eMMC user area was not written and boot selection was preserved.

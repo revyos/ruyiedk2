@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+// Base board wiring comes from the selected Linux DT source tree.
+#include "th1520-milkv-meles.dts"
+
+#include "../Th1520Pkg/Th1520Spi.dtsi"
+
+&firmware_qspi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&firmware_qspi_pins>;
+	num-cs = <1>;
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+		/* No Linux SPI-NOR/MTD consumer may access this device. */
+		status = "reserved";
+	};
+};
+
+&padctrl0_apsys {
+	firmware_qspi_pins: firmware-qspi-0 {
+		data-pins {
+			pins = "QSPI0_SCLK", "QSPI0_D0_MOSI",
+			       "QSPI0_D1_MISO", "QSPI0_D2_WP",
+			       "QSPI0_D3_HOLD";
+			function = "qspi";
+			bias-disable;
+			drive-strength = <7>;
+			input-enable;
+		};
+
+		cs-pins {
+			pins = "QSPI0_CSN0";
+			function = "qspi";
+			bias-disable;
+			drive-strength = <7>;
+			input-disable;
+		};
+	};
+};
