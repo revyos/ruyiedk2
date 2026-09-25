@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Fastboot
+  FILE_GUID = b7c9a614-8a50-4ab8-9622-bafd036a418e
+  MODULE_TYPE = UEFI_APPLICATION
+  VERSION_STRING = 1.0
+  ENTRY_POINT = FastbootMain
+[Sources]
+  Fastboot.c
+  Image.c
+  Image.h
+  Targets.c
+  Targets.h
+  Usb.c
+  Spi.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  CryptoPkg/CryptoPkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  Th1520SpiLib
+  PcdLib
+  Th1520BoardLib
+  BaseLib
+  BaseMemoryLib
+  BaseCryptLib
+  CacheMaintenanceLib
+  FdtLib
+  IoLib
+  MemoryAllocationLib
+  PrintLib
+  TimerLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  UefiLib
+
+[Protocols]
+  gTh1520BootAreaProtocolGuid
+  gTh1520BootPartitionsProtocolGuid
+  gTh1520UsbRoleProtocolGuid
+[Pcd]
+  gTh1520TokenSpaceGuid.PcdRecoveryMode
+  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
+  gTh1520TokenSpaceGuid.PcdFirmwareImageLimit
+  gTh1520TokenSpaceGuid.PcdFitConfiguration
+  gTh1520TokenSpaceGuid.PcdBoardCompatible
+  gTh1520TokenSpaceGuid.PcdFirmwareName
+  gTh1520TokenSpaceGuid.PcdBoardManufacturer
+  gTh1520TokenSpaceGuid.PcdFastbootProduct
