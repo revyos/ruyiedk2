@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = MelesEmmcDxe
+  FILE_GUID = cdb1593b-1ca2-4bd4-b5f5-ceb8db9c5747
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = EmmcInitialize
+[Sources]
+  EmmcDxe.c
+  Adma.c
+  Adma.h
+[Packages]
+  EmbeddedPkg/EmbeddedPkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+  MdePkg/MdePkg.dec
+[LibraryClasses]
+  Th1520MacStoreLib
+  CacheMaintenanceLib
+  PcdLib
+  UefiLib
+  MemoryAllocationLib
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  IoLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gTh1520MacStoreProtocolGuid
+  gFdtClientProtocolGuid
+  gTh1520BootAreaProtocolGuid
+  gTh1520BootPartitionsProtocolGuid
+  gEfiBlockIoProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gEfiCpuArchProtocolGuid
+[Guids]
+  gEfiEndOfDxeEventGroupGuid
+[Depex]
+  gEfiCpuArchProtocolGuid AND gFdtClientProtocolGuid
+[Pcd]
+  gTh1520TokenSpaceGuid.PcdRecoveryMode
+  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
+  gTh1520TokenSpaceGuid.PcdFirmwareImageLimit
