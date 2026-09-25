@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+#include <Guid/HiiPlatformSetupFormset.h>
+#include "Ip4Config.h"
+
+formset
+  guid = IP4_FORM_GUID,
+  title = STRING_TOKEN(STR_TITLE),
+  help = STRING_TOKEN(STR_HELP),
+  classguid = EFI_HII_PLATFORM_SETUP_FORMSET_GUID,
+  varstore IP4_FORM_DATA,
+    varid = 1,
+    name = Ip4Data,
+    guid = IP4_FORM_GUID;
+  form formid = 1, title = STRING_TOKEN(STR_TITLE);
+    subtitle text = STRING_TOKEN(STR_SUBMIT_HELP);
+    checkbox varid = Ip4Data.Dhcp,
+      prompt = STRING_TOKEN(STR_DHCP),
+      help = STRING_TOKEN(STR_DHCP_HELP),
+      default = 1,
+    endcheckbox;
+    suppressif ideqval Ip4Data.Dhcp == 1;
+      string varid = Ip4Data.Address,
+        prompt = STRING_TOKEN(STR_ADDRESS),
+        help = STRING_TOKEN(STR_ADDRESS_HELP),
+        minsize = 0, maxsize = 15,
+      endstring;
+      string varid = Ip4Data.Mask,
+        prompt = STRING_TOKEN(STR_MASK),
+        help = STRING_TOKEN(STR_MASK_HELP),
+        minsize = 0, maxsize = 15,
+      endstring;
+      string varid = Ip4Data.Gateway,
+        prompt = STRING_TOKEN(STR_GATEWAY),
+        help = STRING_TOKEN(STR_GATEWAY_HELP),
+        minsize = 0, maxsize = 15,
+      endstring;
+      string varid = Ip4Data.Dns,
+        prompt = STRING_TOKEN(STR_DNS),
+        help = STRING_TOKEN(STR_DNS_HELP),
+        minsize = 0, maxsize = 255,
+      endstring;
+    endif;
+    text help = STRING_TOKEN(STR_SUBMIT_HELP),
+      text = STRING_TOKEN(STR_SAVE),
+      flags = INTERACTIVE, key = KEY_SAVE;
+  endform;
+endformset;

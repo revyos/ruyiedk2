@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Ip4ConfigDxe
+  FILE_GUID = e1166979-da87-48c5-8859-860262139064
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = Ip4ConfigInitialize
+[Sources]
+  Ip4Config.c
+  Ip4Config.h
+  Config.c
+  Forms.vfr
+  Strings.uni
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  NetworkPkg/NetworkPkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  HiiLib
+  MemoryAllocationLib
+  NetLib
+  PrintLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiHiiServicesLib
+  UefiLib
+[Protocols]
+  gEfiDevicePathProtocolGuid
+  gEfiHiiConfigAccessProtocolGuid
+  gEfiHiiPopupProtocolGuid
+  gEfiIp4Config2ProtocolGuid
+[Depex]
+  TRUE
