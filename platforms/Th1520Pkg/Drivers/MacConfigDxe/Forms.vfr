@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+#include <Guid/HiiPlatformSetupFormset.h>
+#include "MacConfig.h"
+formset
+  guid = MAC_FORM_GUID,
+  title = STRING_TOKEN(STR_TITLE),
+  help = STRING_TOKEN(STR_HELP),
+  classguid = EFI_HII_PLATFORM_SETUP_FORMSET_GUID,
+  varstore MAC_FORM_DATA,
+    varid = 1,
+    name = MacData,
+    guid = MAC_FORM_GUID;
+  form formid = 1, title = STRING_TOKEN(STR_TITLE);
+    subtitle text = STRING_TOKEN(STR_RESTART);
+    suppressif ideqval MacData.Present0 == 0;
+      subtitle text = STRING_TOKEN(STR_PORT0);
+      text help = STRING_TOKEN(STR_PRIORITY),
+        text = STRING_TOKEN(STR_CURRENT0);
+      grayoutif ideqval MacData.Locked0 == 1;
+        checkbox varid = MacData.Use0,
+          prompt = STRING_TOKEN(STR_OVERRIDE),
+          help = STRING_TOKEN(STR_OVERRIDE_HELP),
+          flags = RESET_REQUIRED,
+          default = 0,
+        endcheckbox;
+        grayoutif ideqval MacData.Use0 == 0;
+          string varid = MacData.Address0,
+            prompt = STRING_TOKEN(STR_ADDRESS),
+            help = STRING_TOKEN(STR_ADDRESS_HELP),
+            flags = INTERACTIVE | RESET_REQUIRED,
+            key = KEY_MAC0, minsize = 17, maxsize = 17,
+          endstring;
+        endif;
+      endif;
+    endif;
+    suppressif ideqval MacData.Present1 == 0;
+      subtitle text = STRING_TOKEN(STR_PORT1);
+      text help = STRING_TOKEN(STR_PRIORITY),
+        text = STRING_TOKEN(STR_CURRENT1);
+      grayoutif ideqval MacData.Locked1 == 1;
+        checkbox varid = MacData.Use1,
+          prompt = STRING_TOKEN(STR_OVERRIDE),
+          help = STRING_TOKEN(STR_OVERRIDE_HELP),
+          flags = RESET_REQUIRED,
+          default = 0,
+        endcheckbox;
+        grayoutif ideqval MacData.Use1 == 0;
+          string varid = MacData.Address1,
+            prompt = STRING_TOKEN(STR_ADDRESS),
+            help = STRING_TOKEN(STR_ADDRESS_HELP),
+            flags = INTERACTIVE | RESET_REQUIRED,
+            key = KEY_MAC1, minsize = 17, maxsize = 17,
+          endstring;
+        endif;
+      endif;
+    endif;
+    subtitle text = STRING_TOKEN(STR_EMPTY);
+    text help = STRING_TOKEN(STR_GENERATE_HELP),
+      text = STRING_TOKEN(STR_GENERATE),
+      flags = INTERACTIVE, key = KEY_GENERATE;
+    text help = STRING_TOKEN(STR_AUTO_HELP),
+      text = STRING_TOKEN(STR_AUTO),
+      flags = INTERACTIVE, key = KEY_AUTO;
+    text help = STRING_TOKEN(STR_RESTART),
+      text = STRING_TOKEN(STR_SAVE),
+      flags = INTERACTIVE, key = KEY_SAVE;
+  endform;
+endformset;
