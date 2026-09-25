@@ -48,3 +48,7 @@
   gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut
   gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoHorizontalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution

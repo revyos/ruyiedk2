@@ -101,6 +101,8 @@ GraphicsAvailable (EFI_EVENT Event, VOID *Context)
 {
   EFI_HANDLE Handle;
   EFI_DEVICE_PATH_PROTOCOL *Path;
+  EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop;
+  UINT32 Width, Height;
   UINTN Size;
   while (TRUE)
   {
@@ -111,6 +113,19 @@ GraphicsAvailable (EFI_EVENT Event, VOID *Context)
     Path = DevicePathFromHandle (Handle);
     if (Path == NULL)
       continue;
+    if (!EFI_ERROR (gBS->HandleProtocol (Handle,
+        &gEfiGraphicsOutputProtocolGuid, (VOID **)&Gop)) &&
+        Gop->Mode != NULL && Gop->Mode->Info != NULL)
+    {
+      // Preserve the mode selected by GOP from the sink's EDID, including
+      // in setup. GraphicsConsole otherwise chooses its own resolution.
+      Width = Gop->Mode->Info->HorizontalResolution;
+      Height = Gop->Mode->Info->VerticalResolution;
+      PcdSet32S (PcdVideoHorizontalResolution, Width);
+      PcdSet32S (PcdVideoVerticalResolution, Height);
+      PcdSet32S (PcdSetupVideoHorizontalResolution, Width);
+      PcdSet32S (PcdSetupVideoVerticalResolution, Height);
+    }
     EfiBootManagerUpdateConsoleVariable (ConOut, Path, NULL);
     EfiBootManagerUpdateConsoleVariable (ErrOut, Path, NULL);
     if (ConsoleReady)

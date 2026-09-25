@@ -97,12 +97,12 @@
   gEfiMdePkgTokenSpaceGuid.PcdReportStatusCodePropertyMask|0x02
   gEfiMdePkgTokenSpaceGuid.PcdRiscVFeatureOverride|0
 [PcdsDynamicDefault]
-  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution|800
-  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution|600
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution|0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution|0
   gEfiMdeModulePkgTokenSpaceGuid.PcdConOutColumn|80
   gEfiMdeModulePkgTokenSpaceGuid.PcdConOutRow|25
-  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoHorizontalResolution|640
-  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution|480
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoHorizontalResolution|0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution|0
   gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutColumn|80
   gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutRow|25
   gEfiMdeModulePkgTokenSpaceGuid.PcdEmuVariableNvModeEnable|TRUE
