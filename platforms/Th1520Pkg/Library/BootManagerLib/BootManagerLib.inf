@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = BootManagerLib
+  FILE_GUID = d25a43ad-3e3b-4ccb-a6a9-bcc28c8a6d79
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = PlatformBootManagerLib
+
+[Sources]
+  BootManager.c
+
+[Packages]
+  Th1520Pkg/Th1520Pkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  UefiCpuPkg/UefiCpuPkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  OvmfPkg/OvmfPkg.dec
+
+[LibraryClasses]
+  Th1520MacStoreLib
+  UefiRuntimeServicesTableLib
+  BootLogoLib
+  BaseMemoryLib
+  DevicePathLib
+  MemoryAllocationLib
+  PcdLib
+  PrintLib
+  SerialPortLib
+  UefiBootManagerLib
+  UefiBootServicesTableLib
+  UefiLib
+
+[Guids]
+  gTh1520NvStoreGuid
+  gEdkiiPlatformHasDeviceTreeGuid
+  gEfiEndOfDxeEventGroupGuid
+  gEfiGlobalVariableGuid
+  gEfiEventReadyToBootGuid
+[Protocols]
+  gTh1520MacStoreProtocolGuid
+  gEfiGraphicsOutputProtocolGuid
+  gEfiLoadedImageProtocolGuid
+  gFdtClientProtocolGuid
+
+[Pcd]
+  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
+  gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoHorizontalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution

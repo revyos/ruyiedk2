@@ -42,9 +42,11 @@ Splitter mirroring output to HDMI and serial. The GOP uses a vendor
 controller device path directly so BDS can connect its console.
 
 LogoDxe supplies the openRuyi bitmap to BootLogoLib. The standard BDS
-countdown provides the ten-second timeout and F2/F9/F12 hotkeys. Its
-seconds field has fixed width so redrawing the title does not leave
-old characters behind. There is no separate key-wait loop.
+countdown provides the ten-second timeout and F2/F9/F12 hotkeys.
+Enter skips the remaining countdown and continues normal boot without
+changing the saved timeout or boot order. It uses BDS's continue-key
+registration for both serial and USB keyboards. The seconds field has
+fixed width so redrawing the title does not leave old characters behind.
 
 Scanout uses linear XRGB8888, exposed by GOP as BGRX bytes, with a
 128-byte-aligned stride and reserved framebuffer pages below 4 GiB.
