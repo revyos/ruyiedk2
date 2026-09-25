@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: GPL-2.0-only
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Th1520DisplayDxe
+  FILE_GUID = 3f8a194b-15ce-4088-86d1-4c707c32212a
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = DisplayInitialize
+[Sources]
+  Gop.c
+  Hardware.c
+  Edid.c
+  Display.h
+  DwHdmiRegs.h
+  vs_crtc_regs.h
+  vs_bridge_regs.h
+  vs_primary_plane_regs.h
+  vs_dc_top_regs.h
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  CacheMaintenanceLib
+  DevicePathLib
+  FrameBufferBltLib
+  IoLib
+  MemoryAllocationLib
+  PrintLib
+  SerialPortLib
+  Th1520BoardSupportLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gEfiEdidActiveProtocolGuid
+  gEfiEdidDiscoveredProtocolGuid
+  gFdtClientProtocolGuid
+  gEfiCpuArchProtocolGuid
+[Guids]
+  gEfiEventExitBootServicesGuid
+[Depex]
+  gFdtClientProtocolGuid AND gEfiCpuArchProtocolGuid
