@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = MelesGmacDxe
+  FILE_GUID = bb310e21-cc34-4fce-bf71-cb1028c8f404
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = GmacInitialize
+[Sources]
+  Gmac.c
+  Gmac.h
+  Fdt.c
+  Phy.c
+  Address.c
+  Policy.c
+[Packages]
+  MdeModulePkg/MdeModulePkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+[LibraryClasses]
+  Th1520MacStoreLib
+  PcdLib
+  UefiRuntimeServicesTableLib
+  Th1520BoardSupportLib
+  FdtLib
+  HobLib
+  BaseLib
+  BaseMemoryLib
+  CacheMaintenanceLib
+  DebugLib
+  IoLib
+  MemoryAllocationLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
+[Protocols]
+  gTh1520MacConfigProtocolGuid
+  gEdkiiVariableLockProtocolGuid
+  gTh1520MacStoreProtocolGuid
+  gTh1520NvStoreReadyProtocolGuid
+  gEfiSimpleNetworkProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gFdtClientProtocolGuid
+  gEfiCpuArchProtocolGuid
+[Guids]
+  gTh1520NvStoreGuid
+  gFdtHobGuid
+  gEfiEventExitBootServicesGuid
+[Depex]
+  gFdtClientProtocolGuid AND gEfiCpuArchProtocolGuid AND
+  gTh1520NvStoreReadyProtocolGuid
+
+[Pcd]
+  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc

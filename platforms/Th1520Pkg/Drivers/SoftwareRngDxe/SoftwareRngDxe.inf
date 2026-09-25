@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = SoftwareRngDxe
+  FILE_GUID = 6c9b4358-dab3-4dca-8854-57b4b2a52ee6
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = SoftwareRngInitialize
+[Sources]
+  SoftwareRngDxe.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+[LibraryClasses]
+  BaseMemoryLib
+  RngLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gEfiRngProtocolGuid
+[Guids]
+  gEdkiiRngAlgorithmUnSafe
+[Depex]
+  TRUE
