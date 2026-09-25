@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Th1520SpiLib
+  FILE_GUID = 06104345-e703-4663-9ac3-9f9ff68320bb
+  MODULE_TYPE = BASE
+  VERSION_STRING = 1.0
+  LIBRARY_CLASS = Th1520SpiLib
+[Sources]
+  Spi.c
+  RuntimeIo.c
+  RuntimeIo.h
+  RuntimeAccess.S
+[Packages]
+  MdePkg/MdePkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  CacheMaintenanceLib
+  IoLib
+  TimerLib
