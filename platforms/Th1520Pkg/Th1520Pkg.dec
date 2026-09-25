@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  DEC_SPECIFICATION = 0x0001001b
+  PACKAGE_NAME = Th1520Pkg
+  PACKAGE_GUID = f003fa82-c831-415c-9909-e48a3ed4a9f5
+  PACKAGE_VERSION = 0.1
+[Includes]
+  Include
+[Protocols]
+[LibraryClasses]
+  Th1520BoardLib|Include/Library/Th1520BoardLib.h
+  Th1520BoardSupportLib|Include/Library/Th1520BoardSupportLib.h
+[Guids]
+  gTh1520TokenSpaceGuid = {0x64e872a8, 0x5c0b, 0x4a3b, {0x9f, 0x28, 0xf5, 0xc6, 0x58, 0x7b, 0x80, 0x47}}
+[PcdsFixedAtBuild]
+  gTh1520TokenSpaceGuid.PcdBoardManufacturer|"Milk-V"|VOID*|0x00000001
+  gTh1520TokenSpaceGuid.PcdBoardProduct|"Milk-V Meles"|VOID*|0x00000002
+  gTh1520TokenSpaceGuid.PcdFirmwareName|"Meles EDK2"|VOID*|0x00000003
+  gTh1520TokenSpaceGuid.PcdFastbootProduct|"meles-edk2"|VOID*|0x00000004
+  gTh1520TokenSpaceGuid.PcdFitConfiguration|"meles"|VOID*|0x00000005
+  gTh1520TokenSpaceGuid.PcdBoardCompatible|"milkv,meles"|VOID*|0x00000006
+  gTh1520TokenSpaceGuid.PcdFirmwareImageLimit|0x00800000|UINT32|0x00000007
+  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc|FALSE|BOOLEAN|0x00000008
+  gTh1520TokenSpaceGuid.PcdRecoveryMode|FALSE|BOOLEAN|0x00000009
