@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = MelesUsbHostDxe
+  FILE_GUID = f9a4baeb-0157-4229-aae2-0ef9e7d0c74a
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = UsbHostInitialize
+[Sources]
+  UsbHost.c
+  Dma.c
+  Dma.h
+[Packages]
+  EmbeddedPkg/EmbeddedPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  HobLib
+  Th1520BoardSupportLib
+  Th1520BoardLib
+  BaseLib
+  BaseMemoryLib
+  CacheMaintenanceLib
+  DebugLib
+  IoLib
+  MemoryAllocationLib
+  NonDiscoverableDeviceRegistrationLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
+[Guids]
+  gFdtHobGuid
+[Protocols]
+  gEfiPciIoProtocolGuid
+  gTh1520UsbRoleProtocolGuid
+  gEfiCpuArchProtocolGuid
+[Depex]
+  gEfiCpuArchProtocolGuid
