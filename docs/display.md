@@ -1,203 +1,122 @@
-# TH1520 EDK2 HDMI bring-up
+# TH1520 EDK2 HDMI
 
-The display path is CPU rendering into a linear framebuffer, DC8200
-output 1, then the Synopsys DesignWare HDMI transmitter and its PHY.
-It does not require the GPU, a GPU firmware blob, or a Linux DRM stack.
-DSI and panel initialization are outside this first implementation.
+`Th1520Pkg/Drivers/DisplayDxe` renders into a linear framebuffer and
+uses DC8200 output 1 with the DesignWare HDMI transmitter and PHY.
+It requires enabled `thead,th1520-dc8200` and `thead,th1520-dw-hdmi`
+nodes at the SoC addresses. Meles and LPi4A share the driver.
+GPU initialization and DSI panels are not required or implemented.
 
-## Sources
+## Modes and clocks
 
-The primary reference is the open DC8200 driver in the local
-`~/code/kernel/linux/revyos-linux` repository, branch
-`revyos/7.3.y` (remote-tracking `revyos/revyos/7.3.y`), commit
-`59fb4a4d133d08cf46a28be07be58d8c7a82b870`:
+GOP mode 0 is the first supported choice in this order:
 
-- `drivers/gpu/drm/verisilicon/vs_{crtc,bridge,primary_plane}.c`
-- The corresponding DC8200 register headers.
-- `drivers/gpu/drm/bridge/th1520-dw-hdmi.c`
-- `drivers/gpu/drm/bridge/synopsys/dw-hdmi.{c,h}`
-- `drivers/clk/thead/clk-th1520-ap.c`
-- `drivers/reset/reset-th1520.c`
+1. The base EDID's preferred detailed timing.
+2. A native mode in the first CTA extension.
+3. Another supported mode advertised by the sink.
 
-The TH1520 vendor reference is the parent repository’s `linux/`
-submodule, remote
-`https://github.com/revyos/th1520-linux-kernel.git`, commit
-`a092d55649279e1c9bcda2769b8f6b4370fa2c94` on `th1520-lts`.
-Its `drivers/gpu/drm/verisilicon/` and DW-HDMI core are useful for
-checking cold-start initialization and differences in shadow handling.
-The same vendor tree is available as `th1520/th1520-lts` in the
-local RevyOS checkout. It is a TH1520 reference; A210 platform sequences
-are not used in this port.
+Detailed timings retain their porches, sync widths and independent H/V
+polarities. The driver supports progressive separate-sync modes up to
+1920x1080 and 148.5 MHz, without borders. It also recognizes established
+and standard 800x600/640x480 modes and CTA VICs 1, 4 and 16. Invalid
+checksums, malformed blocks and unsupported modes are rejected.
+Without a usable mode, the serial console remains available.
 
-The port preserves GPL licensing and the attribution of copied register
-definitions and adapted hardware sequences. EDK2 console integration
-uses the existing GraphicsConsoleDxe and FrameBufferBltLib.
+The DPU1 PLL configuration is preserved. Its reset configuration,
+CFG0=`0x01206301` and CFG1=`0x03000000`, produces 1188 MHz. The driver
+only enables the PLL if needed and rounds the pixel divider up, as the
+Linux divider driver does. Dividers 8, 16, 30 and 48 produce 148.5,
+74.25, 39.6 and 24.75 MHz. The last two approximate the nominal SVGA
+and VGA clocks. Other detailed timings may also use an approximate
+clock; the firmware does not retune the PLL to match them exactly.
+VIDEO_PLL is unchanged, and no DT clock-rate override is added.
 
-## Implementation
+HDMI audio, HDCP, 4K/SCDC, interlaced or composite-sync timings,
+DisplayID and further EDID extensions are not supported.
 
-`Th1520Pkg/Drivers/DisplayDxe` is shared by TH1520 boards. The driver
-requires enabled `thead,th1520-dc8200` and `thead,th1520-dw-hdmi` nodes
-at the expected SoC addresses. LPi4A already describes that output graph.
-It does not enable disabled display nodes or touch GPU power or reset.
-Meles enables the same output through its board DT, including the
-Type-A connector and reciprocal HDMI graph endpoints.
+## Console and handoff
 
-- GOP exposes EDID-supported 1920x1080, 1280x720, 800x600 and 640x480.
-  Established and standard EDID timings, detailed timings and the first
-  CTA extension are parsed, with checksum and bounds validation.
-- Preserve the existing DPU1 PLL configuration. Its documented reset
-  values are CFG0=`0x01206301`, CFG1=`0x03000000`, giving 1188 MHz.
-  Only enable the PLL if needed and select a one-based pixel divider,
-  rounding up like the Linux divider driver. Dividers 8, 16, 30 and 48
-  produce 148.5, 74.25, 39.6 and 24.75 MHz respectively. The last two
-  approximate the nominal SVGA/VGA clocks; firmware does not retune the
-  PLL to make those clocks exact. VIDEO_PLL also remains untouched.
-  No assigned-clock-rate override is added to the Linux device tree.
-- Standard EDK2 PCDs request 800x600 for boot and 640x480 for Setup,
-  both with 80x25 text. A sink lacking a requested mode uses the existing
-  EDK2 fallback path. No custom console scaling or GOP wrapper is used.
-- The scanout format is linear XRGB8888, exposed by GOP as BGRX bytes.
-  Framebuffer pages are reserved below 4 GiB for the DC DMA address.
-- GOP Blt operations flush changed framebuffer ranges. A boot-services
-  timer also flushes direct GOP framebuffer writes every 100 ms because
-  firmware uses bare addressing with cacheable DDR.
-- ExitBootServices performs a final clean/invalidate and leaves scanout
-  and its reserved pages in place. The OS must provide suitable framebuffer
-  mappings and its own display/cache management after that point.
-- The graphics device joins ConOut and ErrOut alongside the serial
-  terminal. EDK2 Console Splitter mirrors menu, Shell and error output.
-  SPL/OpenSBI and direct serial debug messages remain on UART.
-  F2, F9 and F12 retain their existing meanings.
-- No HPD, invalid EDID, unsupported modes or bounded hardware timeouts
-  leave the serial console available. There is no forced output mode in
-  the normal driver, and no HDMI hotplug reprobe after DXE initialization.
+BootManager copies GOP's selected resolution into the boot and Setup
+video PCDs before connecting GraphicsConsole. The countdown and menus
+keep that mode. Text dimensions remain 80x25, with the standard Console
+Splitter mirroring output to HDMI and serial. The GOP uses a vendor
+controller device path directly so BDS can connect its console.
 
-The implementation does not include HDMI audio, HDCP, 4K/SCDC,
-arbitrary EDID modes, or a DSI panel driver. OS console policy remains
-under the control of the bootloader and kernel.
+LogoDxe supplies the openRuyi bitmap to BootLogoLib. The standard BDS
+countdown provides the ten-second timeout and F2/F9/F12 hotkeys. Its
+seconds field has fixed width so redrawing the title does not leave
+old characters behind. There is no separate key-wait loop.
 
-## Checks and capture
+Scanout uses linear XRGB8888, exposed by GOP as BGRX bytes, with a
+128-byte-aligned stride and reserved framebuffer pages below 4 GiB.
+Blt flushes changed ranges; a boot-services timer also flushes direct
+framebuffer writes every 100 ms because DDR is cacheable. HDMI attach
+is polled every 500 ms. Reconnecting a different mode catalogue
+reconnects GraphicsConsole so its cached modes are refreshed.
 
-Build commands below run in this repository. Hardware capture records
-and full SPI/boot0 image paths refer to the parent `th1520` repository.
+ExitBootServices stops polling, performs a final cache clean/invalidate,
+and leaves scanout and its reserved pages intact. The OS then owns
+modesetting, framebuffer mappings and cache management.
+
+## Build and checks
+
+Run from this repository:
 
 ```sh
-make edk2-display-check EDK2_BOARD=lpi4a
-make edk2-lpi4a
-make check-artifacts EDK2_BOARD=lpi4a
+make edk2-display-check edk2-hotplug-check
+make edk2 EDK2_BOARD=meles
+make edk2 EDK2_BOARD=lpi4a
 ```
 
-The display checks exercise EDID truncation/corruption, established and
-standard low modes, sync polarities, PLL configuration preservation,
-PHY NACKs, bounded timeouts and scanout shutdown on failure. They are software checks,
-not evidence that HDMI has been electrically validated.
+Host tests cover EDID preference and fallback, malformed descriptors,
+independent sync polarities, stride alignment, PLL preservation, PHY
+failures and hotplug. They do not replace hardware validation.
 
-On the connected development host, `ffmpeg` and `v4l-utils` provide capture.
-The current user can open the following device without extra udev rules:
+On 2026-09-25, Meles SPI write/readback and HDMI capture confirmed the
+EDID-preferred 1920x1080p60 mode at 148.5 MHz. The countdown and F2
+Setup were visible; a subsequent Shell query still reported GOP mode 0
+at 1920x1080. Serial remained usable. Both board builds passed.
+
+With that firmware, five warm reboots of unmodified Ubuntu
+`7.0.0-31-ruyi` reached clear HDMI login screens. Both DPU clocks kept
+`CLK_SET_RATE_UNGATE`; no temporary driver, reload or MMIO repair was
+used. Four boots had one DC probe and one had two. This sample did not
+reproduce the earlier corruption. It does not establish its root cause
+or cover power cycling and normal monitors. LPi4A's current EDID policy
+has been compiled but has not received the same hardware test.
+
+The parent workspace's `build/edid-preferred-test/` contains the tested
+SPI image, manifest and capture evidence. The five old-kernel trials
+are in `build/edid-old-kernel-20260925-1653/`, each with a screenshot,
+serial log, dmesg and DRM state. Earlier U-Boot image records are
+historical and do not identify the current coreboot firmware.
+
+## Capture
+
+Start OBS or continuous capture before booting. The tested MACROSILICON
+card asserts HPD and serves its EDID only while capture is active;
+single-frame capture cannot keep it connected through a reboot.
 
 ```sh
 capture=/dev/v4l/by-id/usb-MACROSILICON_USB3.0_UHD_20210623-video-index0
-v4l2-ctl -d "$capture" --all --list-formats-ext
 ffmpeg -f v4l2 -input_format yuyv422 -video_size 1280x720 \
   -framerate 30 -i "$capture" -vf fps=1 -q:v 3 \
   -update 1 -atomic_writing 1 -y hdmi-live.jpg
 ```
 
-Use the capture card's HDMI input and start OBS or continuous capture
-**before booting the board**. This MACROSILICON capture device asserts
-HPD and serves its EDID while capture is active. In Linux, starting
-capture changes the connector to `connected` with a 256-byte EDID;
-stopping capture changes it back to `disconnected` with an empty EDID.
-Single-frame capture is therefore unsuitable for keeping this sink
-connected during firmware initialization. Wait for a stable frame after
-menu mode changes before saving a snapshot. Stop capture with Ctrl-C
-when handing the device back to OBS.
+The USB capture size is independent of the HDMI input timing. Confirm
+that timing through GOP or DRM state. Stop capture before returning
+the device to OBS.
 
-## Validated behavior
+## Hardware references
 
-The LPi4A capture sink advertises both supported modes. Linux
-`7.0.0-31-ruyi` selects 1920x1080 at 60 Hz, a 148.5 MHz pixel clock,
-linear XRGB8888 and a 7680-byte stride. Its PHY status is `0xf3`.
-The corresponding working DC8200 registers match the firmware's
-configuration. RevyOS 7.3.y remains the hardware programming reference.
+The main reference is RevyOS `revyos/7.3.y`, commit
+`59fb4a4d133d08cf46a28be07be58d8c7a82b870`: the open DC8200 driver in
+`drivers/gpu/drm/verisilicon/`, `th1520-dw-hdmi.c`, the DW-HDMI core,
+and TH1520 clock/reset drivers. The TH1520 vendor tree at
+`https://github.com/revyos/th1520-linux-kernel.git`, commit
+`a092d55649279e1c9bcda2769b8f6b4370fa2c94`, supplies a second reference
+for cold-start and shadow-register handling. A210 sequences are not used.
 
-The native 1080p path and the low-resolution boot/setup paths have been
-exercised on LPi4A. The following are verified:
-
-- Boot0 flash and per-chunk readback verification.
-- openRuyi logo and the standard BDS ten-second progress bar on HDMI.
-- F2/F9/F12 accepted during that progress window.
-- F12 Boot Menu simultaneously visible on HDMI and UART.
-- VGA Firmware Setup fills the active HDMI frame with board model,
-  1.84 GHz and 8192 MB RAM; serial remains 80x25.
-- UEFI Shell text simultaneously visible on HDMI and UART.
-- Both ConOut and ErrOut contain the serial path and static GOP path.
-- F9 USB Fastboot responds with product `lpi4a-edk2`.
-- Launching the installed `fs0:\EFI\BOOT\BOOTRISCV64.EFI` boots Linux.
-  Its early simpledrm framebuffer is replaced by native verisilicon-dc
-  around 10.7 seconds; HDMI reaches the Ubuntu tty1 login screen and
-  the UART root console remains usable. This validates display takeover,
-  not uninterrupted output throughout the userspace boot process.
-- Linux handoff retains the 1188 MHz DPU1 PLL and selects a 148.5 MHz
-  pixel clock for 1080p without any assigned-clock-rate override.
-- LPi4A image policy checks and Meles firmware compilation.
-
-A GOP handle alone is insufficient to validate the console. The initial
-static GOP path included an ACPI ADR suffix without a parent controller
-handle. BDS truncated that suffix, failed to find the parent, and removed
-the graphics path from ConOut. The framebuffer consequently stayed black
-while serial output worked. The driver now exposes its vendor controller
-path directly, allowing standard BDS and GraphicsConsole to connect it.
-No common EDK2 console driver changes are required.
-
-The current verified LPi4A boot0 image is 1,420,852 bytes. Its SHA-256
-is recorded in `build/edk2-lpi4a/tested-boot0.sha256`:
-
-```text
-6239c703a613e8b29f9cf652ea7c14754081b0c758a390e2e9f48a1a03a22098
-```
-
-Historical hardware artifacts remain in the original development checkout
-under `build/edk2-lpi4a/`: the captured EDID,
-Linux register/state samples, and HDMI Boot Menu, Setup and Shell images.
-A physical 720p mode switch has not been tested.
-
-Meles has also been flashed and tested without JTAG through its USB-C
-Fastboot SPI `loader`. On the 16 GiB dual-rank board, the openRuyi
-progress screen, progress-window F2/F9/F12, VGA Setup, SVGA Shell, and
-simultaneous HDMI/UART output are verified. Setup reports Milk-V Meles,
-1.84 GHz and 16384 MB RAM. PLL CFG0/CFG1 remain `0x01206301` and
-`0x03000000` after mode changes. The packaged DTB passes display
-schemas and retains the GL3523 peer-hub/connector graph. Native Linux
-HDMI takeover on Meles has not yet been tested.
-
-Meles SPI image: `build/edk2/uboot/meles-edk2-spi.bin`, 1,417,452 bytes.
-SHA-256: `1a974bbf1a8df752aa67ea9937afb211190868049d7cfa1039c56c4d776b4576`.
-The original manifest and capture evidence remain under its `build/edk2/`.
-
-## Startup presentation
-
-The original openRuyi SVG and its BMP conversion are stored in
-`Th1520Pkg/Drivers/LogoDxe`. A small platform logo provider uses the
-existing BMP decoder; `BootLogoLib` handles presentation and progress.
-The hotkey hint is the progress-bar title. The native BDS wait owns the
-single ten-second timeout; there is no separate manual key-wait loop.
-Serial receives the key hint/countdown, and factory-MAC warnings remain
-visible. The normal unattended timeout was verified to boot Linux.
-
-Firmware does not force Linux clock frequencies at handoff. DC8200 is
-reinitialized by its native driver. The display PLL reference, feedback,
-postdividers and fractional-mode bits are preserved across GOP modes.
-
-## Countdown title redraw
-
-The countdown uses a fixed-width seconds field based on the configured
-boot timeout. BootLogoLib centers each title independently and only
-clears the progress area on its first update. An unpadded countdown
-therefore shifts the title by half a character when 10 becomes 9,
-leaving part of the old F beside F2.
-
-On 2026-09-25, Meles HDMI captures reproduced the doubled F and verified
-that the padded title stays in place through the countdown. SPI write
-and readback passed; Meles and LPi4A builds passed. Display timings and
-PLL programming were unchanged.
+Copied register definitions and adapted hardware sequences retain their
+GPL licensing and attribution. Console integration uses the existing
+GraphicsConsoleDxe, FrameBufferBltLib and BootLogoLib.
