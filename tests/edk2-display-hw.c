@@ -105,6 +105,14 @@ int main (void)
   assert (DisplaySetTiming (&hw, &DisplayTimings[0], 0xbf000000) == EFI_SUCCESS);
   assert (MmioRead32 (0xffef010054ULL) == (BIT24 | BIT25));
   assert (!(MmioRead32 (DC + 0x143c) & BIT31));
+  DISPLAY_TIMING custom = {
+      1366, 768, 85500000, 70, 143, 213, 3, 3, 24, 0, TRUE, FALSE};
+  assert (DisplaySetTiming (&hw, &custom, 0xbf000000) == EFI_SUCCESS);
+  assert (MmioRead32 (DC + 0x140c) == 1376 * 4);
+  assert (!(MmioRead32 (DC + 0x143c) & BIT31));
+  assert (MmioRead32 (DC + 0x144c) & BIT31);
+  assert (MmioRead32 (HDMI + 4 * HDMI_FC_INVIDCONF) == 0x38);
+  assert (MmioRead32 (HDMI + 4 * HDMI_FC_AVICONF1) == 0x08);
   // Equivalent power-on 1188 MHz PLL using fractional feedback is preserved.
   regs[0].Value = 0x01103101;
   regs[1].Value = 0x800000;

@@ -8,8 +8,9 @@ EFI_GUID gEfiDevicePathProtocolGuid, gEfiGraphicsOutputProtocolGuid;
 EFI_GUID gEfiEdidDiscoveredProtocolGuid, gEfiEdidActiveProtocolGuid;
 static BOOLEAN Connected, BadEdid;
 static unsigned Installs, Reinstalls, Disconnects, Stops, Modes, Flushes;
-static UINT8 Pixels[256];
-CONST DISPLAY_TIMING DisplayTimings[DISPLAY_MAX_MODES] = {
+static UINT8 Pixels[1024];
+static UINT16 HFront;
+CONST DISPLAY_TIMING DisplayTimings[DISPLAY_STANDARD_MODES] = {
   {.Width = 8, .Height = 8}, {.Width = 8, .Height = 4}
 };
 BOOLEAN DisplayConnected (DISPLAY_HW *Hw) { return Connected; }
@@ -21,8 +22,9 @@ EFI_STATUS DisplayReadEdid (DISPLAY_HW *Hw)
 VOID DisplayParseEdid (DISPLAY_HW *Hw)
 {
   Hw->ModeCount = 2;
-  Hw->Modes[0] = &DisplayTimings[0];
-  Hw->Modes[1] = &DisplayTimings[1];
+  Hw->Modes[0] = DisplayTimings[0];
+  Hw->Modes[1] = DisplayTimings[1];
+  Hw->Modes[0].HFront = HFront;
 }
 EFI_STATUS DisplaySetTiming (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *Mode,
                              EFI_PHYSICAL_ADDRESS Buffer)
@@ -106,10 +108,20 @@ int main (void)
   assert (mDisplay.Online && !Disconnects && !Reinstalls);
   assert (Pixels[0] == 0x5a);
   assert (Installs == 1 && Modes == 2);
+  assert (mDisplay.Info.PixelsPerScanLine == 32);
+  assert (mDisplay.Mode.FrameBufferSize == sizeof (Pixels));
+  // A different sink can use the same dimensions with different porches.
+  Connected = FALSE;
+  Poll ();
+  HFront = 8;
+  Connected = TRUE;
+  Poll ();
+  assert (Disconnects == 1 && Reinstalls == 1 && Modes == 3);
+  assert (mDisplay.Hw.Modes[0].HFront == 8 && Pixels[0] == 0);
   Exit (NULL, &mDisplay);
   unsigned Before = Flushes;
   Connected = FALSE;
   Poll ();
-  assert (Stops == 1 && Flushes == Before);
+  assert (Stops == 2 && Flushes == Before);
   puts ("HDMI: late attach, EDID retry, reconnect and OS handoff passed");
 }

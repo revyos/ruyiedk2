@@ -212,7 +212,7 @@ STATIC EFI_STATUS PixelClock (CONST DISPLAY_TIMING *T)
 STATIC EFI_STATUS PhyEnable (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *T)
 {
   STATIC CONST UINT8 Registers[] = {0x06, 0x10, 0x11, 0x0e, 0x09, 0x19};
-  STATIC CONST UINT16 Parameters[DISPLAY_MAX_MODES][6] = {
+  STATIC CONST UINT16 Parameters[][ARRAY_SIZE (Registers)] = {
       {0x0001, 0x2080, 0x020a, 0x01a0, 0x8088, 0x0007},
       {0x0002, 0x1142, 0x0214, 0x01a0, 0x8088, 0x0007},
       {0x0003, 0x0285, 0x0228, 0x01a0, 0x8088, 0x0007},
@@ -263,8 +263,8 @@ DisplaySetTiming (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *T, EFI_PHYSICAL_ADDRESS 
   UINTN Index;
   UINT32 HBlank = T->HFront + T->HSync + T->HBack;
   UINT32 VBlank = T->VFront + T->VSync + T->VBack;
-  UINT8 Invid = 0x10 | (T->PositiveSync ? 0x60 : 0) | (Hw->HdmiSink ? 8 : 0);
-  UINT32 Sync = BIT (30) | (T->PositiveSync ? 0 : BIT (31));
+  UINT8 Invid = 0x10 | (T->HPositiveSync ? 0x20 : 0) |
+                (T->VPositiveSync ? 0x40 : 0) | (Hw->HdmiSink ? 8 : 0);
   EFI_STATUS Status;
   DisplayDisable (Hw);
   Status = PixelClock (T);
@@ -301,7 +301,9 @@ DisplaySetTiming (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *T, EFI_PHYSICAL_ADDRESS 
   WriteHdmi (Hw, HDMI_A_HDCPCFG0, 0);
   WriteHdmi (Hw, HDMI_A_HDCPCFG1, 2);
   WriteHdmi (Hw, HDMI_FC_AVICONF0, 0x60);
-  WriteHdmi (Hw, HDMI_FC_AVICONF1, T->Width * 3 == T->Height * 4 ? 0x18 : 0x28);
+  WriteHdmi (Hw, HDMI_FC_AVICONF1,
+      T->Width * 3 == T->Height * 4 ? 0x18 :
+      T->Width * 9 == T->Height * 16 ? 0x28 : 0x08);
   WriteHdmi (Hw, HDMI_FC_AVICONF2, 8);
   WriteHdmi (Hw, HDMI_FC_AVICONF3, 0);
   WriteHdmi (Hw, HDMI_FC_AVIVID, T->Vic);
@@ -312,12 +314,17 @@ DisplaySetTiming (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *T, EFI_PHYSICAL_ADDRESS 
   MmioWrite32 (Hw->Dc + VSDC_DISP_HSIZE (1), T->Width | ((T->Width + HBlank) << 16));
   MmioWrite32 (Hw->Dc + VSDC_DISP_VSIZE (1), T->Height | ((T->Height + VBlank) << 16));
   MmioWrite32 (Hw->Dc + VSDC_DISP_HSYNC (1),
-               Sync | (T->Width + T->HFront) | ((T->Width + T->HFront + T->HSync) << 15));
+               BIT (30) | (T->HPositiveSync ? 0 : BIT (31)) |
+               (T->Width + T->HFront) |
+               ((T->Width + T->HFront + T->HSync) << 15));
   MmioWrite32 (Hw->Dc + VSDC_DISP_VSYNC (1),
-               Sync | (T->Height + T->VFront) | ((T->Height + T->VFront + T->VSync) << 15));
+               BIT (30) | (T->VPositiveSync ? 0 : BIT (31)) |
+               (T->Height + T->VFront) |
+               ((T->Height + T->VFront + T->VSync) << 15));
   MmioWrite32 (Hw->Dc + VSDC_FB_CONFIG (1), 5U << 26); // Linear XRGB8888.
   MmioWrite32 (Hw->Dc + VSDC_FB_ADDRESS (1), (UINT32)FrameBuffer);
-  MmioWrite32 (Hw->Dc + VSDC_FB_STRIDE (1), T->Width * 4);
+  MmioWrite32 (Hw->Dc + VSDC_FB_STRIDE (1),
+               ALIGN_VALUE (T->Width, 32) * 4);
   MmioWrite32 (Hw->Dc + VSDC_FB_SIZE (1), T->Width | (T->Height << 15));
   MmioWrite32 (Hw->Dc + VSDC_FB_TOP_LEFT (1), 0);
   MmioWrite32 (Hw->Dc + VSDC_FB_BOTTOM_RIGHT (1), T->Width | (T->Height << 15));

@@ -63,7 +63,7 @@ STATIC VOID ModeInfo (CONST DISPLAY_TIMING *T, EFI_GRAPHICS_OUTPUT_MODE_INFORMAT
   ZeroMem (Info, sizeof (*Info));
   Info->HorizontalResolution = T->Width;
   Info->VerticalResolution = T->Height;
-  Info->PixelsPerScanLine = T->Width;
+  Info->PixelsPerScanLine = ALIGN_VALUE (T->Width, 32);
   Info->PixelFormat = PixelBlueGreenRedReserved8BitPerColor;
 }
 
@@ -79,7 +79,7 @@ STATIC EFI_STATUS EFIAPI QueryMode (EFI_GRAPHICS_OUTPUT_PROTOCOL *This, UINT32 N
   {
     return EFI_OUT_OF_RESOURCES;
   }
-  ModeInfo (mDisplay.Hw.Modes[Number], *Info);
+  ModeInfo (&mDisplay.Hw.Modes[Number], *Info);
   *Size = sizeof (**Info);
   return EFI_SUCCESS;
 }
@@ -98,11 +98,11 @@ STATIC EFI_STATUS EFIAPI SetMode (EFI_GRAPHICS_OUTPUT_PROTOCOL *This, UINT32 Num
   {
     return EFI_UNSUPPORTED;
   }
-  ModeInfo (D->Hw.Modes[Number], &Info);
+  ModeInfo (&D->Hw.Modes[Number], &Info);
   OldTpl = gBS->RaiseTPL (TPL_NOTIFY);
   ZeroMem ((VOID *)(UINTN)D->Buffer, D->BufferSize);
   WriteBackDataCacheRange ((VOID *)(UINTN)D->Buffer, D->BufferSize);
-  Status = DisplaySetTiming (&D->Hw, D->Hw.Modes[Number], D->Buffer);
+  Status = DisplaySetTiming (&D->Hw, &D->Hw.Modes[Number], D->Buffer);
   if (!EFI_ERROR (Status))
   {
     Status = FrameBufferBltConfigure ((VOID *)(UINTN)D->Buffer, &Info, D->Blt, &D->BltSize);
@@ -116,7 +116,7 @@ STATIC EFI_STATUS EFIAPI SetMode (EFI_GRAPHICS_OUTPUT_PROTOCOL *This, UINT32 Num
   else if (D->Mode.Mode != MAX_UINT32)
   {
     // Restore the last working mode if a later PHY reconfiguration fails.
-    DisplaySetTiming (&D->Hw, D->Hw.Modes[D->Mode.Mode], D->Buffer);
+    DisplaySetTiming (&D->Hw, &D->Hw.Modes[D->Mode.Mode], D->Buffer);
   }
   gBS->RestoreTPL (OldTpl);
   return Status;
@@ -261,7 +261,7 @@ Probe (DISPLAY *D)
   {
     // Keep the console and framebuffer when the same sink reconnects.
     D->Hw = Next;
-    Status = DisplaySetTiming (&D->Hw, D->Hw.Modes[D->Mode.Mode],
+    Status = DisplaySetTiming (&D->Hw, &D->Hw.Modes[D->Mode.Mode],
                                 D->Buffer);
     D->Online = !EFI_ERROR (Status);
     return Status;
@@ -276,6 +276,10 @@ Probe (DISPLAY *D)
   D->Hw = Next;
   D->Mode.MaxMode = D->Hw.ModeCount;
   D->Mode.Mode = MAX_UINT32;
+  Log ("HDMI: EDID %a %ux%u, %u kHz\r\n",
+       D->Hw.Preferred ? "preferred" : "fallback",
+       D->Hw.Modes[0].Width, D->Hw.Modes[0].Height,
+       D->Hw.Modes[0].Clock / 1000);
   Status = SetMode (&D->Gop, 0);
   if (EFI_ERROR (Status))
     return Status;
@@ -327,7 +331,8 @@ DisplayInitialize (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   if (EFI_ERROR (Status) && Status != EFI_NOT_FOUND)
     return Status;
   // Allocate once, also for headless boots. Keep scanout fixed.
-  D->BufferSize = EFI_PAGES_TO_SIZE (EFI_SIZE_TO_PAGES (1920 * 1080 * 4));
+  D->BufferSize = EFI_PAGES_TO_SIZE (EFI_SIZE_TO_PAGES (
+      DISPLAY_MAX_WIDTH * DISPLAY_MAX_HEIGHT * 4));
   D->Buffer = MAX_UINT32;
   Status = gBS->AllocatePages (AllocateMaxAddress, EfiReservedMemoryType,
       EFI_SIZE_TO_PAGES (D->BufferSize), &D->Buffer);
