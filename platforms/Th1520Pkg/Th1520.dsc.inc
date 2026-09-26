@@ -168,7 +168,7 @@
   Th1520Pkg/Drivers/DisplayDxe/DisplayDxe.inf
   Th1520Pkg/Drivers/LogoDxe/LogoDxe.inf
   MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
-  Th1520Pkg/Drivers/SoftwareRngDxe/SoftwareRngDxe.inf
+  RiscVPlatformPkg/Drivers/SoftwareRngDxe/SoftwareRngDxe.inf
   MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
   MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
   MdeModulePkg/Universal/DriverHealthManagerDxe/DriverHealthManagerDxe.inf
