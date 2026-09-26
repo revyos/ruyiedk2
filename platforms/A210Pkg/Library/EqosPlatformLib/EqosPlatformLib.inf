@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210EqosPlatformLib
+  FILE_GUID = a31df4c3-271c-41de-84ce-19e19807ad8b
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = EqosPlatformLib|DXE_DRIVER
+[Sources]
+  Platform.c
+  Address.c
+[Packages]
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  A210Pkg/A210Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  A210ClockLib
+  A210BootMediaLib
+  MemoryAllocationLib
+  BaseLib
+  BaseMemoryLib
+  FdtLib
+  HobLib
+  IoLib
+  RngLib
+  TimerLib
+  UefiLib
+[Guids]
+  gFdtHobGuid
+[Protocols]
+  gEfiBlockIoProtocolGuid
+[Depex]
+  gEfiBlockIoProtocolGuid

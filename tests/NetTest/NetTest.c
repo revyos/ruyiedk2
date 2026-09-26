@@ -24,32 +24,45 @@ NetTestMain (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
   VOID *Cookie;
   UINT64 Start, PacketStart, Elapsed;
   UINT32 Saved;
-  UINTN Base = 0xffe7070000ULL;
+  UINTN Base;
+  BOOLEAN A210;
   EFI_TPL Tpl;
   BOOLEAN Tested = FALSE;
   FDT_CLIENT_PROTOCOL *Fdt;
   CONST VOID *Compatible;
   UINT32 CompatibleSize;
-  Status = gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL,
-                                 (VOID **)&Fdt);
-  if (EFI_ERROR (Status) || EFI_ERROR (Fdt->GetNodeProperty (
-      Fdt, 0, "compatible", &Compatible, &CompatibleSize)) ||
-      CompatibleSize < sizeof ("milkv,meles") ||
-      CompareMem (Compatible, "milkv,meles", sizeof ("milkv,meles")))
-  {
+  INT32 SocNode;
+  Status
+      = gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL, (VOID **)&Fdt);
+  if (EFI_ERROR (Status)
+      || EFI_ERROR (Fdt->GetNodeProperty (Fdt, 0, "compatible",
+                                          &Compatible, &CompatibleSize)))
     return EFI_UNSUPPORTED;
+  A210 = FALSE;
+  if (CompatibleSize >= sizeof ("milkv,meles")
+      && !CompareMem (Compatible, "milkv,meles", sizeof ("milkv,meles")))
+    Base = 0xffe7070000ULL;
+  else if (!EFI_ERROR (Fdt->FindCompatibleNode (
+               Fdt, "zhihe,a210", &SocNode))
+           && SocNode == 0)
+  {
+    Base = 0x02100000;
+    A210 = TRUE;
   }
-  Status = gBS->LocateHandleBuffer (ByProtocol,
-      &gEfiSimpleNetworkProtocolGuid, NULL, &Count, &Handles);
-  Print (L"SNP locate: %r, count=%u\n", Status, EFI_ERROR (Status) ? 0 : Count);
+  else
+    return EFI_UNSUPPORTED;
+  Status = gBS->LocateHandleBuffer (
+      ByProtocol, &gEfiSimpleNetworkProtocolGuid, NULL, &Count, &Handles);
+  Print (L"SNP locate: %r, count=%u\n", Status,
+         EFI_ERROR (Status) ? 0 : Count);
   if (EFI_ERROR (Status))
   {
     return Status;
   }
   for (Index = 0; Index < Count; Index++)
   {
-    Status = gBS->HandleProtocol (Handles[Index],
-        &gEfiSimpleNetworkProtocolGuid, (VOID **)&Snp);
+    Status = gBS->HandleProtocol (
+        Handles[Index], &gEfiSimpleNetworkProtocolGuid, (VOID **)&Snp);
     if (EFI_ERROR (Status))
     {
       continue;
@@ -57,14 +70,41 @@ NetTestMain (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
     EFI_DEVICE_PATH_PROTOCOL *Path;
     // PXE children publish aliases of the same SNP. Use the MAC-only
     // physical handle so disconnecting its consumers leaves SNP alive.
-    if (EFI_ERROR (gBS->HandleProtocol (Handles[Index],
-        &gEfiDevicePathProtocolGuid, (VOID **)&Path)) ||
-        Path->Type != MESSAGING_DEVICE_PATH ||
-        Path->SubType != MSG_MAC_ADDR_DP ||
-        ((EFI_DEVICE_PATH_PROTOCOL *)((UINT8 *)Path +
-          sizeof (MAC_ADDR_DEVICE_PATH)))->Type != END_DEVICE_PATH_TYPE)
+    if (EFI_ERROR (gBS->HandleProtocol (
+            Handles[Index], &gEfiDevicePathProtocolGuid, (VOID **)&Path))
+        || Path->Type != MESSAGING_DEVICE_PATH
+        || Path->SubType != MSG_MAC_ADDR_DP
+        || ((EFI_DEVICE_PATH_PROTOCOL *)((UINT8 *)Path
+                                         + sizeof (MAC_ADDR_DEVICE_PATH)))
+                   ->Type
+               != END_DEVICE_PATH_TYPE)
     {
       continue;
+    }
+    if (A210)
+    {
+      INT32 Node = -1;
+      BOOLEAN Found = FALSE;
+      while (!EFI_ERROR (Fdt->FindNextCompatibleNode (
+          Fdt, "zhihe,a210-dwmac", Node, &Node)))
+      {
+        CONST VOID *Mac, *Reg;
+        UINT32 MacSize, RegSize;
+        if (!EFI_ERROR (Fdt->GetNodeProperty (Fdt, Node, "mac-address",
+                                              &Mac, &MacSize))
+            && MacSize == 6
+            && !CompareMem (Mac, Snp->Mode->PermanentAddress.Addr, 6)
+            && !EFI_ERROR (
+                Fdt->GetNodeProperty (Fdt, Node, "reg", &Reg, &RegSize))
+            && RegSize == 16)
+        {
+          Base = SwapBytes64 (ReadUnaligned64 (Reg));
+          Found = TRUE;
+          break;
+        }
+      }
+      if (!Found)
+        continue;
     }
     Print (L"SNP %u: state=%u\n", Index, Snp->Mode->State);
     gBS->DisconnectController (Handles[Index], NULL, NULL);
@@ -83,12 +123,18 @@ NetTestMain (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
     {
       break;
     }
-    Snp->ReceiveFilters (Snp, EFI_SIMPLE_NETWORK_RECEIVE_UNICAST,
-                         0, FALSE, 0, NULL);
+    if (!Snp->Mode->MediaPresent)
+    {
+      Snp->Shutdown (Snp);
+      gBS->ConnectController (Handles[Index], NULL, NULL, TRUE);
+      continue;
+    }
+    Snp->ReceiveFilters (Snp, EFI_SIMPLE_NETWORK_RECEIVE_UNICAST, 0, FALSE,
+                         0, NULL);
     Tested = TRUE;
     Saved = MmioRead32 (Base);
-    Print (L"SNP loopback: MAC=%08x, RGMII divider=%08x\n", Saved,
-           MmioRead32 (0xffec00300cULL));
+    Print (L"SNP loopback: MAC=%08x, interface clock=%08x\n", Saved,
+           MmioRead32 (A210 ? Base + 0xf000 : 0xffec00300cULL));
     // Keep other SNP consumers out of this bounded diagnostic session.
     Tpl = gBS->RaiseTPL (TPL_CALLBACK);
     MmioWrite32 (Base, Saved | BIT12);
@@ -119,9 +165,10 @@ NetTestMain (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
         {
           Cookie = NULL;
           Status = Snp->GetStatus (Snp, NULL, &Cookie);
-        } while (!EFI_ERROR (Status) && Cookie == NULL &&
-            GetTimeInNanoSecond (GetPerformanceCounter () - PacketStart) <
-            100000000);
+        } while (
+            !EFI_ERROR (Status) && Cookie == NULL
+            && GetTimeInNanoSecond (GetPerformanceCounter () - PacketStart)
+                   < 100000000);
         if (EFI_ERROR (Status) || Cookie != Tx[Slot])
         {
           Status = EFI_TIMEOUT;
@@ -138,9 +185,10 @@ NetTestMain (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
         {
           Size = sizeof (Rx);
           Status = Snp->Receive (Snp, NULL, &Size, Rx, NULL, NULL, NULL);
-        } while (Status == EFI_NOT_READY &&
-            GetTimeInNanoSecond (GetPerformanceCounter () - PacketStart) <
-            100000000);
+        } while (
+            Status == EFI_NOT_READY
+            && GetTimeInNanoSecond (GetPerformanceCounter () - PacketStart)
+                   < 100000000);
         if (EFI_ERROR (Status))
         {
           break;
@@ -168,9 +216,11 @@ NetTestMain (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
     gBS->ConnectController (Handles[Index], NULL, NULL, TRUE);
     Print (L"SNP loopback: %u verified frames, %Lu ms, %Lu KiB/s: %r\n",
            Frame, DivU64x32 (Elapsed, 1000000),
-           Elapsed ? DivU64x64Remainder (
-               (UINT64)Frame * sizeof (Tx[0]) * 1000000000,
-               Elapsed * 1024, NULL) : 0, Status);
+           Elapsed ? DivU64x64Remainder ((UINT64)Frame * sizeof (Tx[0])
+                                             * 1000000000,
+                                         Elapsed * 1024, NULL)
+                   : 0,
+           Status);
     break;
   }
   FreePool (Handles);
