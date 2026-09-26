@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210BootMediaLib
+  FILE_GUID = e7e9f2b6-b4b4-48b9-b8b8-a9e6a2432b30
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = A210BootMediaLib|DXE_DRIVER UEFI_APPLICATION
+[Sources]
+  BootMedia.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DevicePathLib
+  MemoryAllocationLib
+  UefiBootServicesTableLib
+[Protocols]
+  gEfiBlockIoProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gEdkiiNonDiscoverableDeviceProtocolGuid

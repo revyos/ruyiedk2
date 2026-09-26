@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210FastbootPlatformLib
+  FILE_GUID = 9d9f310e-f131-419f-9116-4058c7a47c7e
+  MODULE_TYPE = UEFI_APPLICATION
+  LIBRARY_CLASS = FastbootPlatformLib
+[Sources]
+  Storage.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  A210Pkg/A210Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  A210BootMediaLib
+  MemoryAllocationLib
+  PcdLib
+  PrintLib
+  UefiBootServicesTableLib
+[Protocols]
+  gEfiBlockIoProtocolGuid
+[Pcd]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVersionString

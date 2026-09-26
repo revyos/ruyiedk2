@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210UsbDevicePlatformLib
+  FILE_GUID = e85e692a-cde3-43df-a731-2d673b559326
+  MODULE_TYPE = UEFI_APPLICATION
+  LIBRARY_CLASS = UsbDevicePlatformLib
+[Sources]
+  UsbPhy.c
+[Packages]
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  A210Pkg/A210Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  IoLib
+  TimerLib
+  UefiBootServicesTableLib
+[Protocols]
+  gFdtClientProtocolGuid

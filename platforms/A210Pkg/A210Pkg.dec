@@ -8,3 +8,4 @@
   Include
 [LibraryClasses]
   A210ClockLib|Include/Library/A210ClockLib.h
+  A210BootMediaLib|Include/Library/A210BootMediaLib.h
