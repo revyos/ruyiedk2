@@ -9,3 +9,4 @@
 [LibraryClasses]
   PlatformResourceLib|Include/Library/PlatformResourceLib.h
   DisplayPlatformLib|Include/Library/DisplayPlatformLib.h
+  DisplayConsoleLib|Include/Library/DisplayConsoleLib.h

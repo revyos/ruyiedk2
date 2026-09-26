@@ -32,6 +32,7 @@
 [BuildOptions.common.EDKII.DXE_RUNTIME_DRIVER]
   GCC:*_*_*_DLINK_FLAGS = -z common-page-size=0x1000
 [LibraryClasses.common]
+  DisplayConsoleLib|RiscVPlatformPkg/Library/DisplayConsoleLib/DisplayConsoleLib.inf
   DisplayPlatformLib|Th1520Pkg/Library/DisplayPlatformLib/DisplayPlatformLib.inf
   Th1520MacStoreLib|Th1520Pkg/Library/MacStoreLib/MacStoreLib.inf
   Th1520NvStoreLib|Th1520Pkg/Library/NvStoreLib/NvStoreLib.inf

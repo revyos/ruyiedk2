@@ -12,7 +12,7 @@
 #include <Protocol/Th1520NvStore.h>
 #include <Library/Th1520MacStoreLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
-#include <Protocol/GraphicsOutput.h>
+#include <Library/DisplayConsoleLib.h>
 #include <Guid/SerialPortLibVendor.h>
 #include <Guid/EventGroup.h>
 #include <Guid/PlatformHasDeviceTree.h>
@@ -93,46 +93,6 @@ STATIC VOID EFIAPI
 Notify (EFI_EVENT Event, VOID *Context)
 {
 }
-STATIC VOID *GraphicsRegistration;
-STATIC BOOLEAN ConsoleReady;
-
-STATIC VOID EFIAPI
-GraphicsAvailable (EFI_EVENT Event, VOID *Context)
-{
-  EFI_HANDLE Handle;
-  EFI_DEVICE_PATH_PROTOCOL *Path;
-  EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop;
-  UINT32 Width, Height;
-  UINTN Size;
-  while (TRUE)
-  {
-    Size = sizeof (Handle);
-    if (EFI_ERROR (gBS->LocateHandle (ByRegisterNotify, NULL,
-        GraphicsRegistration, &Size, &Handle)))
-      break;
-    Path = DevicePathFromHandle (Handle);
-    if (Path == NULL)
-      continue;
-    if (!EFI_ERROR (gBS->HandleProtocol (Handle,
-        &gEfiGraphicsOutputProtocolGuid, (VOID **)&Gop)) &&
-        Gop->Mode != NULL && Gop->Mode->Info != NULL)
-    {
-      // Preserve the mode selected by GOP from the sink's EDID, including
-      // in setup. GraphicsConsole otherwise chooses its own resolution.
-      Width = Gop->Mode->Info->HorizontalResolution;
-      Height = Gop->Mode->Info->VerticalResolution;
-      PcdSet32S (PcdVideoHorizontalResolution, Width);
-      PcdSet32S (PcdVideoVerticalResolution, Height);
-      PcdSet32S (PcdSetupVideoHorizontalResolution, Width);
-      PcdSet32S (PcdSetupVideoVerticalResolution, Height);
-    }
-    EfiBootManagerUpdateConsoleVariable (ConOut, Path, NULL);
-    EfiBootManagerUpdateConsoleVariable (ErrOut, Path, NULL);
-    if (ConsoleReady)
-      EfiBootManagerConnectAllDefaultConsoles ();
-  }
-}
-
 VOID EFIAPI
 PlatformBootManagerBeforeConsole (VOID)
 {
@@ -180,8 +140,7 @@ PlatformBootManagerBeforeConsole (VOID)
   EfiBootManagerUpdateConsoleVariable (ConIn, (VOID *)&UsbKeyboard, NULL);
   EfiBootManagerUpdateConsoleVariable (ConOut, (VOID *)&Console, NULL);
   EfiBootManagerUpdateConsoleVariable (ErrOut, (VOID *)&Console, NULL);
-  EfiCreateProtocolNotifyEvent (&gEfiGraphicsOutputProtocolGuid,
-      TPL_CALLBACK, GraphicsAvailable, NULL, &GraphicsRegistration);
+  DisplayConsoleInitialize ();
   if (!EFI_ERROR (gBS->CreateEventEx (EVT_NOTIFY_SIGNAL, TPL_CALLBACK, Notify, NULL,
                                       &gEfiEndOfDxeEventGroupGuid, &Event)))
   {
@@ -357,7 +316,7 @@ PlatformBootManagerAfterConsole (VOID)
   EFI_EVENT Event;
   STATIC CONST CHAR8 Keys[] =
       "Enter: Boot    F2: Setup    F9: USB Fastboot    F12: Boot Menu\r\n";
-  ConsoleReady = TRUE;
+  DisplayConsoleReady ();
   EfiBootManagerConnectAll ();
   EfiBootManagerRefreshAllBootOption ();
   ReportNetworkAddress ();

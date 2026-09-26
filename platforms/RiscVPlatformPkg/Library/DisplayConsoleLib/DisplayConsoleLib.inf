@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = DisplayConsoleLib
+  FILE_GUID = 537a0f53-cf10-442b-81ce-3c92f9e3bd8b
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = DisplayConsoleLib|DXE_DRIVER
+[Sources]
+  Console.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  DevicePathLib
+  PcdLib
+  UefiBootManagerLib
+  UefiBootServicesTableLib
+  UefiLib
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid
+[Pcd]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoHorizontalResolution
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution
