@@ -32,6 +32,7 @@
 [BuildOptions.common.EDKII.DXE_RUNTIME_DRIVER]
   GCC:*_*_*_DLINK_FLAGS = -z common-page-size=0x1000
 [LibraryClasses.common]
+  DisplayPlatformLib|Th1520Pkg/Library/DisplayPlatformLib/DisplayPlatformLib.inf
   Th1520MacStoreLib|Th1520Pkg/Library/MacStoreLib/MacStoreLib.inf
   Th1520NvStoreLib|Th1520Pkg/Library/NvStoreLib/NvStoreLib.inf
   Th1520SpiLib|Th1520Pkg/Library/SpiLib/SpiLib.inf
@@ -165,7 +166,7 @@
   Th1520Pkg/Drivers/GmacDxe/GmacDxe.inf
   Th1520Pkg/Drivers/MacConfigDxe/MacConfigDxe.inf
   Th1520Pkg/Drivers/Ip4ConfigDxe/Ip4ConfigDxe.inf
-  Th1520Pkg/Drivers/DisplayDxe/DisplayDxe.inf
+  RiscVPlatformPkg/Drivers/Dc8200Dxe/DisplayDxe.inf
   Th1520Pkg/Drivers/LogoDxe/LogoDxe.inf
   MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
   RiscVPlatformPkg/Drivers/SoftwareRngDxe/SoftwareRngDxe.inf

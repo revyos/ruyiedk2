@@ -198,7 +198,7 @@ STATIC VOID EFIAPI Refresh (EFI_EVENT Event, VOID *Context)
       Probe (D);
   }
   // GOP clients may write FrameBufferBase without calling Blt(). Bare-mode
-  // C910 DDR is cacheable, so also publish such writes while boot services run.
+  // The framebuffer is cacheable, so also publish such writes while boot services run.
   if (!D->Exited && D->Mode.Mode != MAX_UINT32)
   {
     WriteBackDataCacheRange ((VOID *)(UINTN)D->Buffer, D->Mode.FrameBufferSize);
@@ -212,33 +212,6 @@ STATIC VOID EFIAPI Exit (EFI_EVENT Event, VOID *Context)
   WriteBackInvalidateDataCacheRange ((VOID *)(UINTN)D->Buffer, D->BufferSize);
   // Leave scanout active and its reserved pages intact. The OS owns display
   // clocks and must map the framebuffer with non-cacheable/write-combine PTEs.
-}
-
-STATIC EFI_STATUS FindDevice (FDT_CLIENT_PROTOCOL *Fdt, CONST CHAR8 *Compatible, UINTN Expected,
-                              UINTN *Base)
-{
-  INT32 Node;
-  CONST VOID *Property;
-  UINT32 Size;
-  EFI_STATUS Status;
-  Status = Fdt->FindCompatibleNode (Fdt, Compatible, &Node);
-  if (EFI_ERROR (Status))
-  {
-    return Status;
-  }
-  Status = Fdt->GetNodeProperty (Fdt, Node, "status", &Property, &Size);
-  if (!EFI_ERROR (Status) && !((Size == 5 && CompareMem (Property, "okay", 5) == 0) ||
-                               (Size == 3 && CompareMem (Property, "ok", 3) == 0)))
-  {
-    return EFI_NOT_FOUND;
-  }
-  Status = Fdt->GetNodeProperty (Fdt, Node, "reg", &Property, &Size);
-  if (EFI_ERROR (Status) || Size != 16 || SwapBytes64 (ReadUnaligned64 (Property)) != Expected)
-  {
-    return EFI_UNSUPPORTED;
-  }
-  *Base = Expected;
-  return EFI_SUCCESS;
 }
 
 STATIC EFI_STATUS
@@ -319,12 +292,7 @@ DisplayInitialize (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
                                 (VOID **)&Fdt);
   if (EFI_ERROR (Status))
     return Status;
-  Status = FindDevice (Fdt, "thead,th1520-dc8200", 0xffef600000ULL,
-                       &D->Hw.Dc);
-  if (EFI_ERROR (Status))
-    return Status;
-  Status = FindDevice (Fdt, "thead,th1520-dw-hdmi", 0xffef540000ULL,
-                       &D->Hw.Hdmi);
+  Status = DisplayPlatformGetResources (Fdt, &D->Hw);
   if (EFI_ERROR (Status))
     return Status;
   Status = DisplayPrepare (&D->Hw);

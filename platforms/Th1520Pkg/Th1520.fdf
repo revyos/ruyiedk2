@@ -86,7 +86,7 @@ INF Th1520Pkg/Drivers/NvStoreDxe/NvStoreDxe.inf
 INF Th1520Pkg/Drivers/GmacDxe/GmacDxe.inf
 INF Th1520Pkg/Drivers/MacConfigDxe/MacConfigDxe.inf
 INF Th1520Pkg/Drivers/Ip4ConfigDxe/Ip4ConfigDxe.inf
-INF Th1520Pkg/Drivers/DisplayDxe/DisplayDxe.inf
+INF RiscVPlatformPkg/Drivers/Dc8200Dxe/DisplayDxe.inf
 INF Th1520Pkg/Drivers/LogoDxe/LogoDxe.inf
 INF MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
 FILE FREEFORM = b9317e41-2a84-4d83-8e31-a67838815ff2 {

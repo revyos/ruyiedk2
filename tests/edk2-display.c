@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-#include "../platforms/Th1520Pkg/Drivers/DisplayDxe/Display.h"
+#include "../platforms/RiscVPlatformPkg/Drivers/Dc8200Dxe/Display.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>

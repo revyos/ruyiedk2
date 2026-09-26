@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0-only
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Th1520DisplayPlatformLib
+  FILE_GUID = ce503814-9b25-41be-817e-317573ab2a73
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = DisplayPlatformLib|DXE_DRIVER
+[Sources]
+  Platform.c
+[Packages]
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  IoLib
+  Th1520BoardSupportLib
+  TimerLib

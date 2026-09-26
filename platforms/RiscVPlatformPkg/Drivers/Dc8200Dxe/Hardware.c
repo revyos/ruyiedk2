@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-// TH1520 register sequences and PHY values adapted from RevyOS 7.3.y:
+// DC8200 and DW-HDMI sequences adapted from RevyOS 7.3.y:
 // Copyright (C) 2025 Icenowy Zheng <uwu@icenowy.me>
 // DW HDMI programming follows Linux dw-hdmi.c and U-Boot dw_hdmi.c.
 #include "Display.h"
@@ -8,10 +8,7 @@
 #include "vs_primary_plane_regs.h"
 #include "vs_bridge_regs.h"
 #include "vs_dc_top_regs.h"
-#include <Library/Th1520BoardSupportLib.h>
 
-#define AP 0xffef010000ULL
-#define VO 0xffef528000ULL
 
 STATIC UINT8 ReadHdmi (DISPLAY_HW *Hw, UINTN Register)
 {
@@ -80,22 +77,14 @@ EFI_STATUS
 DisplayPrepare (DISPLAY_HW *Hw)
 {
   UINTN Try;
-  // The M-mode platform releases VO and configures both display IOPMPs.
-  // Keep GPU clocks, reset and power domain untouched.
-  MmioOr32 (VO + 0x50, BIT (0) | BIT (6) | BIT (7) | BIT (8) | BIT (9) | BIT (10) | BIT (11) |
-                           BIT (20) | BIT (21) | BIT (22) | BIT (27) | BIT (28));
-  MmioOr32 (VO + 0x54, BIT (0));
-  MmioOr32 (VO + 0x04, 7);
-  MmioOr32 (VO + 0x14, 3);
-  MicroSecondDelay (10);
+  EFI_STATUS Status = DisplayPlatformPrepare (Hw);
+  if (EFI_ERROR (Status))
+    return Status;
   if (MmioRead32 (Hw->Dc + VSDC_TOP_CHIP_MODEL) != 0x8200)
   {
     return EFI_UNSUPPORTED;
   }
   MmioWrite32 (Hw->Dc + VSDC_TOP_IRQ_EN, 0);
-  // HDMI DDC pins (pad group 3, SCL and SDA); preserve CEC and fan.
-  Th1520Pad (0xffec007000ULL, 36, 0, BIT9 | 3);
-  Th1520Pad (0xffec007000ULL, 37, 0, BIT9 | 3);
   WriteHdmi (Hw, HDMI_IH_MUTE, 3);
   // dw_hdmi_init_hw(): initialize status polarities before polling them.
   WriteHdmi (Hw, HDMI_PHY_I2CM_INT_ADDR, 8);
@@ -162,53 +151,6 @@ DisplayReadEdid (DISPLAY_HW *Hw)
   return EFI_SUCCESS;
 }
 
-STATIC EFI_STATUS PixelClock (CONST DISPLAY_TIMING *T)
-{
-  UINTN Try;
-  UINT32 Cfg0, Cfg1, Ref, Post1, Post2, Divider;
-  UINT64 Feedback, Rate;
-  // The PLL is shared with the subsequent OS driver. Preserve its power-on
-  // reference/feedback/postdividers and fractional mode across GOP modes.
-  Cfg0 = MmioRead32 (AP + 0x50);
-  Cfg1 = MmioRead32 (AP + 0x54);
-  Ref = Cfg0 & 0x3f;
-  Post1 = (Cfg0 >> 20) & 7;
-  Post2 = (Cfg0 >> 24) & 7;
-  if (Ref == 0 || Post1 == 0 || Post2 == 0 || (Cfg1 & BIT (30)))
-  {
-    return EFI_UNSUPPORTED;
-  }
-  Feedback = (UINT64)((Cfg0 >> 8) & 0xfff) << 24;
-  if (!(Cfg1 & BIT (24)))
-  {
-    Feedback += Cfg1 & 0xffffff;
-  }
-  Rate = 24000000ULL * Feedback / ((UINT64)Ref * Post1 * Post2 << 24);
-  // CLK_DIVIDER_ONE_BASED without ROUND_CLOSEST: round the divider up.
-  // With the 1188 MHz PLL this yields 148.5/74.25/39.6/24.75 MHz.
-  if (Rate == 0 || T->Clock == 0 || (Rate + T->Clock - 1) / T->Clock > 255)
-  {
-    return EFI_UNSUPPORTED;
-  }
-  Divider = (UINT32)((Rate + T->Clock - 1) / T->Clock);
-  // Enable a powered-down PLL without retuning it.
-  MmioAnd32 (AP + 0x54, ~BIT (29));
-  for (Try = 0; Try < 100; Try++)
-  {
-    if (MmioRead32 (AP + 0x80) & BIT (9))
-    {
-      MicroSecondDelay (30);
-      MmioAnd32 (AP + 0x1ec, ~BIT (8));
-      MicroSecondDelay (1);
-      MmioAndThenOr32 (AP + 0x1ec, ~0xffU, Divider);
-      MmioOr32 (AP + 0x1ec, BIT (8));
-      return EFI_SUCCESS;
-    }
-    MicroSecondDelay (1);
-  }
-  return EFI_TIMEOUT;
-}
-
 STATIC EFI_STATUS PhyEnable (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *T)
 {
   STATIC CONST UINT8 Registers[] = {0x06, 0x10, 0x11, 0x0e, 0x09, 0x19};
@@ -221,6 +163,10 @@ STATIC EFI_STATUS PhyEnable (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *T)
   UINTN Row = T->Clock > 90000000 ? 0 :
               T->Clock > 44900000 ? 1 : T->Clock > 35500000 ? 2 : 3;
   EFI_STATUS Status;
+  UINT16 Values[ARRAY_SIZE (Registers)];
+  for (Index = 0; Index < ARRAY_SIZE (Values); Index++)
+    Values[Index] = Parameters[Row][Index];
+  DisplayPlatformPhyConfig (Hw, T, Values);
   for (Pass = 0; Pass < 2; Pass++)
   {
     ModifyHdmi (Hw, HDMI_PHY_CONF0, 0x1b, 0x12);
@@ -234,7 +180,7 @@ STATIC EFI_STATUS PhyEnable (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *T)
     ModifyHdmi (Hw, HDMI_PHY_TST0, 0x20, 0);
     for (Index = 0; Index < ARRAY_SIZE (Registers); Index++)
     {
-      Status = WritePhy (Hw, Registers[Index], Parameters[Row][Index]);
+      Status = WritePhy (Hw, Registers[Index], Values[Index]);
       if (EFI_ERROR (Status))
       {
         return Status;
@@ -267,7 +213,7 @@ DisplaySetTiming (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *T, EFI_PHYSICAL_ADDRESS 
                 (T->VPositiveSync ? 0x40 : 0) | (Hw->HdmiSink ? 8 : 0);
   EFI_STATUS Status;
   DisplayDisable (Hw);
-  Status = PixelClock (T);
+  Status = DisplayPlatformPixelClock (Hw, T);
   if (EFI_ERROR (Status))
   {
     return Status;

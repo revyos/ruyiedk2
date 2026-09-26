@@ -8,3 +8,4 @@
   Include
 [LibraryClasses]
   PlatformResourceLib|Include/Library/PlatformResourceLib.h
+  DisplayPlatformLib|Include/Library/DisplayPlatformLib.h

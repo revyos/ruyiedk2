@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 [Defines]
   INF_VERSION = 0x0001001b
-  BASE_NAME = Th1520DisplayDxe
+  BASE_NAME = Dc8200DisplayDxe
   FILE_GUID = 3f8a194b-15ce-4088-86d1-4c707c32212a
   MODULE_TYPE = DXE_DRIVER
   VERSION_STRING = 1.0
@@ -20,7 +20,7 @@
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
   EmbeddedPkg/EmbeddedPkg.dec
-  Th1520Pkg/Th1520Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
 [LibraryClasses]
   BaseLib
   BaseMemoryLib
@@ -31,7 +31,7 @@
   MemoryAllocationLib
   PrintLib
   SerialPortLib
-  Th1520BoardSupportLib
+  DisplayPlatformLib
   TimerLib
   UefiBootServicesTableLib
   UefiDriverEntryPoint
