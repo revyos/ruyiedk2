@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = FdtSmbiosDxe
+  FILE_GUID = 8b9dfd6b-257c-4e38-8d25-2cdff6845d94
+  MODULE_TYPE = DXE_DRIVER
+  ENTRY_POINT = SmbiosInitialize
+[Sources]
+  Smbios.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  OvmfPkg/OvmfPkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  FdtLib
+  HobLib
+  MemoryAllocationLib
+  PcdLib
+  PlatformSmbiosLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gEfiSmbiosProtocolGuid
+[Guids]
+  gFdtHobGuid
+[Pcd]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVendor
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVersionString
+  gUefiOvmfPkgTokenSpaceGuid.PcdOvmfFirmwareFdSize
+[Depex]
+  gEfiSmbiosProtocolGuid

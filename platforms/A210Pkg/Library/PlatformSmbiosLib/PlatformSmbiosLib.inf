@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210PlatformSmbiosLib
+  FILE_GUID = 442a5961-ecb7-46d6-8465-5bb95cd8f24f
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = PlatformSmbiosLib
+[Sources]
+  Processor.c
+[Packages]
+  MdePkg/MdePkg.dec
+  UefiCpuPkg/UefiCpuPkg.dec
+  OvmfPkg/OvmfPkg.dec
+  A210Pkg/A210Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  A210ClockLib
+  BaseLib
+  BaseMemoryLib
+  FdtLib
+  HobLib
+  MapMmioLib
+  PrintLib
