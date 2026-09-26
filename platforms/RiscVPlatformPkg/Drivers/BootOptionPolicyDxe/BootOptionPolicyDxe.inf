@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = BootOptionPolicyDxe
+  FILE_GUID = c865b65c-dbf5-46f0-802d-cbc306378c7c
+  MODULE_TYPE = DXE_DRIVER
+  ENTRY_POINT = BootOptionPolicyInitialize
+[Sources]
+  BootOptionPolicy.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+[LibraryClasses]
+  BaseLib
+  DevicePathLib
+  MemoryAllocationLib
+  UefiBootManagerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gEdkiiPlatformBootManagerProtocolGuid
+[Depex]
+  TRUE

@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = SerialBootManagerLib
+  FILE_GUID = 92a22c96-e586-4d1a-bb6b-b99ad642bf05
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = PlatformBootManagerLib
+[Sources]
+  BootManager.c
+[Packages]
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+[LibraryClasses]
+  DisplayConsoleLib
+  BaseMemoryLib
+  DevicePathLib
+  MemoryAllocationLib
+  PcdLib
+  UefiBootManagerLib
+  UefiBootServicesTableLib
+  UefiLib
+[Guids]
+  gEdkiiPlatformHasDeviceTreeGuid
+  gEfiEndOfDxeEventGroupGuid
+[Protocols]
+  gEfiLoadedImageProtocolGuid
+[Pcd]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVersionString
