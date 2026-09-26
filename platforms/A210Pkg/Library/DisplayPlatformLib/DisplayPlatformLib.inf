@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-2.0-only
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210DisplayPlatformLib
+  FILE_GUID = 60b4d644-6b97-46c1-bc05-98149c09c2e0
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = DisplayPlatformLib|DXE_DRIVER
+[Sources]
+  Platform.c
+[Packages]
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  A210Pkg/A210Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  A210ClockLib
+  BaseLib
+  BaseMemoryLib
+  FdtLib
+  HobLib
+  IoLib
+  TimerLib
+[Guids]
+  gFdtHobGuid
