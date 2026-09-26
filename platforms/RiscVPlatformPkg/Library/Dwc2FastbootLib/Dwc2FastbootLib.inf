@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Dwc2FastbootLib
+  FILE_GUID = af2440e1-9d52-4c30-872e-c88b39e027a8
+  MODULE_TYPE = UEFI_APPLICATION
+  LIBRARY_CLASS = FastbootTransportLib
+[Sources]
+  Usb.c
+  Dwc2.h
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  FastbootPlatformLib
+  IoLib
+  PcdLib
+  TimerLib
+  UsbDevicePlatformLib
+  UefiBootServicesTableLib
+[Pcd]
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVendor
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVersionString
