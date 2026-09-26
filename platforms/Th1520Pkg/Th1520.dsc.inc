@@ -44,7 +44,8 @@
   DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLib.inf
   TpmMeasurementLib|MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
   ImagePropertiesRecordLib|MdeModulePkg/Library/ImagePropertiesRecordLib/ImagePropertiesRecordLib.inf
-  PlatformSecLib|Th1520Pkg/Library/PlatformSecLib/PlatformSecLib.inf
+  PlatformSecLib|RiscVPlatformPkg/Library/PlatformSecLib/PlatformSecLib.inf
+  PlatformResourceLib|Th1520Pkg/Library/PlatformResourceLib/PlatformResourceLib.inf
 !if $(RECOVERY_BUILD) == TRUE
   PlatformBootManagerLib|Th1520Pkg/Library/RecoveryBootManagerLib/RecoveryBootManagerLib.inf
 !else

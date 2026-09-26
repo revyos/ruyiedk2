@@ -1,13 +1,14 @@
 /** @file
-  Copyright (c) 2021, Hewlett Packard Enterprise Development LP. All rights reserved.<BR>
-  Copyright (c) 2025, Ventana Micro Systems Inc. All rights reserved.<BR>
-
+  Copyright (c) 2021, Hewlett Packard Enterprise Development LP.
+  Copyright (c) 2025, Ventana Micro Systems Inc.
   SPDX-License-Identifier: BSD-2-Clause-Patent
-
 **/
-
-#include "PlatformSecLib.h"
-#include <Library/IoLib.h>
+#include <Base.h>
+#include <Library/BaseLib.h>
+#include <Library/DebugLib.h>
+#include <Library/FdtLib.h>
+#include <Library/HobLib.h>
+#include <Library/PlatformResourceLib.h>
 #include <Library/Th1520BoardSupportLib.h>
 
 /**
@@ -68,61 +69,16 @@ PopulateIoResources (
   }
 }
 
-/**
-  Perform Platform initialization.
-
-  @param  FdtPointer      The pointer to the device tree.
-
-  @return EFI_SUCCESS     The platform initialized successfully.
-  @retval  Others        - As the error code indicates
-
-**/
 EFI_STATUS
 EFIAPI
-PlatformInitialization (
-  VOID  *FdtPointer
-  )
+PlatformResourceInit (VOID *Fdt)
 {
-  VOID    *Base;
-  VOID    *NewBase;
-  UINTN   FdtSize;
-  UINTN   FdtPages;
-  UINT64  *FdtHobData;
-
-  SerialPortInitialize ();
-
-  DEBUG ((DEBUG_INFO, "%a: Build FDT HOB - FDT at address: 0x%x \n", __func__, FdtPointer));
-  Base = FdtPointer;
-  if (FdtCheckHeader (Base) != 0) {
-    DEBUG ((DEBUG_ERROR, "%a: Corrupted DTB\n", __func__));
-    return EFI_UNSUPPORTED;
-  }
-
-  FdtSize  = FdtTotalSize (Base);
-  FdtPages = EFI_SIZE_TO_PAGES (FdtSize);
-  NewBase  = AllocatePages (FdtPages);
-  if (NewBase == NULL) {
-    DEBUG ((DEBUG_ERROR, "%a: Could not allocate memory for DTB\n", __func__));
-    return EFI_UNSUPPORTED;
-  }
-
-  FdtOpenInto (Base, NewBase, EFI_PAGES_TO_SIZE (FdtPages));
-
-  FdtHobData = BuildGuidHob (&gFdtHobGuid, sizeof *FdtHobData);
-  if (FdtHobData == NULL) {
-    DEBUG ((DEBUG_ERROR, "%a: Could not build FDT Hob\n", __func__));
-    return EFI_UNSUPPORTED;
-  }
-
-  *FdtHobData = (UINTN)NewBase;
-
   // TimerLib needs the FDT HOB before GPIO supply delays can run.
-  EFI_STATUS Status = Th1520FdtEarlyInit (NewBase);
+  EFI_STATUS Status = Th1520FdtEarlyInit (Fdt);
   if (EFI_ERROR (Status))
     DEBUG ((DEBUG_ERROR, "TH1520 board resources: %r\n", Status));
 
-  PopulateIoResources (Base, "snps,dw-apb-uart");
-  BuildMemoryAllocationHob (PcdGet32 (PcdOvmfDxeMemFvBase), SIZE_4MB, EfiBootServicesData);
+  PopulateIoResources (Fdt, "snps,dw-apb-uart");
   BuildMemoryAllocationHob (0, EFI_PAGE_SIZE, EfiReservedMemoryType);
   AddIoMemoryBaseSizeHob (0xffe7000000ULL, SIZE_1MB);
   AddIoMemoryBaseSizeHob (0xffea000000ULL, SIZE_4KB);

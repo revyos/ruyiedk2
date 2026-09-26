@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Th1520PlatformResourceLib
+  FILE_GUID = 1abd7b0d-ed53-41ef-8a7b-2d9f32f99d29
+  MODULE_TYPE = SEC
+  LIBRARY_CLASS = PlatformResourceLib|SEC
+[Sources]
+  Platform.c
+[Packages]
+  MdePkg/MdePkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  BaseLib
+  DebugLib
+  FdtLib
+  HobLib
+  Th1520BoardSupportLib

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  DEC_SPECIFICATION = 0x0001001b
+  PACKAGE_NAME = RiscVPlatformPkg
+  PACKAGE_GUID = ece21783-0cb8-4172-aa6b-b6044becf569
+  PACKAGE_VERSION = 0.1
+[Includes]
+  Include
+[LibraryClasses]
+  PlatformResourceLib|Include/Library/PlatformResourceLib.h

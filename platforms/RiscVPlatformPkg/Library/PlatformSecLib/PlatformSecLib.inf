@@ -24,8 +24,7 @@
   SecEntry.S
 
 [LibraryClasses]
-  Th1520BoardSupportLib
-  IoLib
+  PlatformResourceLib
   BaseLib
   BaseMemoryLib
   CpuExceptionHandlerLib
@@ -39,7 +38,7 @@
   PrePiLib
 
 [Packages]
-  Th1520Pkg/Th1520Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
   EmbeddedPkg/EmbeddedPkg.dec
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
@@ -49,6 +48,7 @@
 [Pcd]
   gUefiOvmfPkgTokenSpaceGuid.PcdOvmfSecPeiTempRamBase
   gUefiOvmfPkgTokenSpaceGuid.PcdOvmfSecPeiTempRamSize
+  gUefiOvmfPkgTokenSpaceGuid.PcdOvmfFirmwareFdSize
   gUefiOvmfPkgTokenSpaceGuid.PcdOvmfDxeMemFvBase
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIReclaimMemory
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIMemoryNVS
