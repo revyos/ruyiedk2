@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210EmmcHostDxe
+  FILE_GUID = b624908e-fc05-4907-92bc-cc85a20a6a13
+  MODULE_TYPE = DXE_DRIVER
+  ENTRY_POINT = EmmcHostInitialize
+[Sources]
+  EmmcHost.c
+  Emmc.h
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  A210ClockLib
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  IoLib
+  TimerLib
+  NonDiscoverableDeviceRegistrationLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gFdtClientProtocolGuid
+  gEdkiiSdMmcOverrideProtocolGuid
+[Depex]
+  gFdtClientProtocolGuid

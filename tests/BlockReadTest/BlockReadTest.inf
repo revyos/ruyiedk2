@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = BlockReadTest
+  FILE_GUID = 382bfe15-1c0c-43e4-92c0-c89da81dc35e
+  MODULE_TYPE = DXE_DRIVER
+  ENTRY_POINT = BlockReadTest
+[Sources]
+  BlockReadTest.c
+[Packages]
+  MdePkg/MdePkg.dec
+[LibraryClasses]
+  BaseMemoryLib
+  MemoryAllocationLib
+  PrintLib
+  SerialPortLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gEfiBlockIoProtocolGuid
+  gEfiBdsArchProtocolGuid
+[Depex]
+  gEfiBlockIoProtocolGuid AND gEfiBdsArchProtocolGuid
