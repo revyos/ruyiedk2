@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  DEC_SPECIFICATION = 0x0001001b
+  PACKAGE_NAME = A210Pkg
+  PACKAGE_GUID = 52ef1da9-e826-40b7-b0c7-90f54f918ee2
+  PACKAGE_VERSION = 0.1
+[Includes]
+  Include
+[LibraryClasses]
+  A210ClockLib|Include/Library/A210ClockLib.h

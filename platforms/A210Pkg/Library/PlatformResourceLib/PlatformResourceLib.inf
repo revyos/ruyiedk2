@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210PlatformResourceLib
+  FILE_GUID = 63d98da8-b97e-47cf-a6c4-3c2bac4e1771
+  MODULE_TYPE = SEC
+  LIBRARY_CLASS = PlatformResourceLib|SEC
+[Sources]
+  Resources.c
+[Packages]
+  MdePkg/MdePkg.dec
+  A210Pkg/A210Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  BaseLib
+  DebugLib
+  FdtLib
+  HobLib
