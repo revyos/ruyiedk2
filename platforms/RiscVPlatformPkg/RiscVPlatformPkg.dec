@@ -12,5 +12,6 @@
   FastbootPlatformLib|Include/Library/FastbootPlatformLib.h
   UsbDevicePlatformLib|Include/Library/UsbDevicePlatformLib.h
   PlatformSmbiosLib|Include/Library/PlatformSmbiosLib.h
+  EqosPlatformLib|Include/Library/EqosPlatformLib.h
   DisplayPlatformLib|Include/Library/DisplayPlatformLib.h
   DisplayConsoleLib|Include/Library/DisplayConsoleLib.h

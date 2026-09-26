@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = DwMac4Dxe
+  FILE_GUID = 5ae40381-8582-4e35-a4b9-d8a90f559282
+  MODULE_TYPE = DXE_DRIVER
+  VERSION_STRING = 1.0
+  ENTRY_POINT = GmacInitialize
+[Sources]
+  Gmac.c
+  Gmac.h
+  Phy.c
+[Packages]
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  EqosPlatformLib
+  BaseLib
+  BaseMemoryLib
+  CacheMaintenanceLib
+  DebugLib
+  IoLib
+  MemoryAllocationLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
+[Protocols]
+  gEfiSimpleNetworkProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gFdtClientProtocolGuid
+  gEfiCpuArchProtocolGuid
+[Guids]
+  gEfiEventExitBootServicesGuid
+[Depex]
+  gFdtClientProtocolGuid AND gEfiCpuArchProtocolGuid
