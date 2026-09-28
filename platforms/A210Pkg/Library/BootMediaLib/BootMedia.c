@@ -10,13 +10,13 @@
 #include <Protocol/NonDiscoverableDevice.h>
 
 EFI_STATUS
-A210LocateBootAreas (EFI_BLOCK_IO_PROTOCOL *Boot[2])
+A210LocateEmmcAreas (EFI_BLOCK_IO_PROTOCOL *Areas[3])
 {
   EFI_HANDLE *Handles, Controller;
   UINTN Count;
   EFI_STATUS Status;
 
-  ZeroMem (Boot, 2 * sizeof (*Boot));
+  ZeroMem (Areas, 3 * sizeof (*Areas));
   Status = gBS->LocateHandleBuffer (ByProtocol, &gEfiBlockIoProtocolGuid,
                                     NULL, &Count, &Handles);
   if (Status == EFI_NOT_FOUND)
@@ -64,9 +64,20 @@ A210LocateBootAreas (EFI_BLOCK_IO_PROTOCOL *Boot[2])
         Partition = ReadUnaligned32 (
             &((CONTROLLER_DEVICE_PATH *)Path)->ControllerNumber);
     }
-    if (Emmc && Partition >= 1 && Partition <= 2)
-      Boot[Partition - 1] = Io;
+    if (Emmc && Partition <= 2)
+      Areas[Partition] = Io;
   }
   FreePool (Handles);
   return EFI_SUCCESS;
+}
+
+EFI_STATUS
+A210LocateBootAreas (EFI_BLOCK_IO_PROTOCOL *Boot[2])
+{
+  EFI_BLOCK_IO_PROTOCOL *Areas[3];
+  EFI_STATUS Status = A210LocateEmmcAreas (Areas);
+
+  Boot[0] = Areas[1];
+  Boot[1] = Areas[2];
+  return Status;
 }

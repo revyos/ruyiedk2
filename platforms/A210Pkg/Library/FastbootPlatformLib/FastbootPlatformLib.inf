@@ -16,10 +16,12 @@
   BaseLib
   BaseMemoryLib
   A210BootMediaLib
+  FastbootStorageLib
   MemoryAllocationLib
   PcdLib
   PrintLib
   UefiBootServicesTableLib
+  UefiLib
 [Protocols]
   gEfiBlockIoProtocolGuid
 [Pcd]
