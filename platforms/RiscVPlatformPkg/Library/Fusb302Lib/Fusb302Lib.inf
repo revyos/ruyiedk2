@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Fusb302Lib
+  FILE_GUID = 0d3c92ec-2a4d-4814-ae27-f41c0063294e
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = Fusb302Lib
+[Sources]
+  Fusb302.c
+[Packages]
+  MdePkg/MdePkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  TimerLib

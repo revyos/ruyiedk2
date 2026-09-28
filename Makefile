@@ -488,3 +488,16 @@ edk2-fastboot-storage-check:
 		-Iplatforms/RiscVPlatformPkg/Include tests/edk2-fastboot-progress.c \
 		-o $(EDK2_BUILD)/test-fastboot-progress
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-fastboot-progress
+
+.PHONY: edk2-typec-check
+check: edk2-typec-check
+edk2-typec-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -Wall -Wextra -Wno-unused-parameter \
+		-fsanitize=address,undefined -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-Iplatforms/RiscVPlatformPkg/Include tests/edk2-fusb302.c \
+		platforms/RiscVPlatformPkg/Library/Fusb302Lib/Fusb302.c \
+		-o $(EDK2_BUILD)/test-fusb302
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-fusb302
