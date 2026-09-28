@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210UsbHostDxe
+  FILE_GUID = 6171c96a-5803-4c5c-a7b2-78b948276142
+  MODULE_TYPE = DXE_DRIVER
+  ENTRY_POINT = UsbHostInitialize
+[Sources]
+  UsbHost.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  A210UsbHostLib
+  DebugLib
+  NonDiscoverableDeviceRegistrationLib
+  UefiDriverEntryPoint
+[Depex]
+  gEfiCpuArchProtocolGuid
+[Protocols]
+  gEfiCpuArchProtocolGuid

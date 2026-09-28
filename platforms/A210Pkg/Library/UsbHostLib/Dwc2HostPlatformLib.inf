@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210Dwc2HostPlatformLib
+  FILE_GUID = 6bfe571e-7a6f-4de0-bc95-41527b1b64d7
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = Dwc2HostPlatformLib
+[Sources]
+  Dwc2.c
+[Packages]
+  MdePkg/MdePkg.dec
+  A210Pkg/A210Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  A210UsbHostLib

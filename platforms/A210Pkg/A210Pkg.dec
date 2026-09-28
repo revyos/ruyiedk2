@@ -7,7 +7,8 @@
 [Includes]
   Include
 [LibraryClasses]
-  A210PciLib|Include/Library/A210PciLib.h
   A210PeripheralLib|Include/Library/A210PeripheralLib.h
+  A210PciLib|Include/Library/A210PciLib.h
+  A210UsbHostLib|Include/Library/A210UsbHostLib.h
   A210ClockLib|Include/Library/A210ClockLib.h
   A210BootMediaLib|Include/Library/A210BootMediaLib.h

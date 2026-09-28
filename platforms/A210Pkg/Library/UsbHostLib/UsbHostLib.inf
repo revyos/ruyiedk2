@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210UsbHostLib
+  FILE_GUID = 14a7f494-7ee3-41f2-a8be-4d7a047687dd
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = A210UsbHostLib
+[Sources]
+  UsbHost.c
+[Packages]
+  MdePkg/MdePkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  A210PeripheralLib
+  BaseLib
+  DebugLib
+  FdtLib
+  IoLib
+  TimerLib
