@@ -17,6 +17,7 @@
   FastbootTransportLib
   MemoryAllocationLib
   PrintLib
+  SerialPortLib
   TimerLib
   UefiApplicationEntryPoint
   UefiBootServicesTableLib

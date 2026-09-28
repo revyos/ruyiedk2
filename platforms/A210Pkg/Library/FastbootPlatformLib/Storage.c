@@ -133,12 +133,13 @@ FastbootRead (CONST CHAR8 *Name, UINT64 Offset, UINTN Size, VOID *Data)
 }
 
 EFI_STATUS
-FastbootFlash (CONST CHAR8 *Name, CONST VOID *Data, UINTN Size)
+FastbootFlash (CONST CHAR8 *Name, CONST VOID *Data, UINTN Size,
+               FASTBOOT_STORAGE_PROGRESS Progress)
 {
   EFI_BLOCK_IO_PROTOCOL *Io = Target (Name);
 
   if (Io == NULL)
     return EFI_NOT_FOUND;
   return FastbootWriteImage (Io, Data, Size,
-                             Io != mEmmc[1] && Io != mEmmc[2], NULL);
+                             Io != mEmmc[1] && Io != mEmmc[2], Progress);
 }

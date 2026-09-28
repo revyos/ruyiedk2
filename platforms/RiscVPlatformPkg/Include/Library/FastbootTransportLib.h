@@ -4,5 +4,6 @@
 
 EFI_STATUS FastbootUsbStart (VOID);
 VOID FastbootUsbStop (VOID);
+EFI_STATUS FastbootUsbPoll (VOID);
 EFI_STATUS FastbootUsbReceive (VOID *Buffer, UINTN *Length);
 EFI_STATUS FastbootUsbSend (CONST VOID *Buffer, UINTN Length);

@@ -6,11 +6,13 @@
 #include <Library/FastbootTransportLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PrintLib.h>
+#include <Library/SerialPortLib.h>
 #include <Library/TimerLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiLib.h>
 
 #define PACKET_BYTES SIZE_16KB
+#define DOWNLOAD_TIMEOUT_NS 5000000000ULL
 
 STATIC EFI_STATUS
 Reply (CONST CHAR8 *Prefix, CONST CHAR8 *Value)
@@ -18,6 +20,47 @@ Reply (CONST CHAR8 *Prefix, CONST CHAR8 *Value)
   CHAR8 Response[65];
   AsciiSPrint (Response, sizeof (Response), "%a%a", Prefix, Value);
   return FastbootUsbSend (Response, AsciiStrLen (Response));
+}
+
+STATIC UINT64 mLastProgress;
+STATIC CONST CHAR8 *mFlashTarget;
+STATIC BOOLEAN mProgressNow, mVerify;
+
+STATIC EFI_STATUS
+FlashProgress (UINT64 Done, UINT64 Total, BOOLEAN Verify)
+{
+  EFI_INPUT_KEY Key;
+  CHAR8 Value[60], SerialLine[128];
+  UINT64 Now;
+  EFI_STATUS Status = FastbootUsbPoll ();
+
+  if (EFI_ERROR (Status))
+    return Status;
+  if (!EFI_ERROR (gST->ConIn->ReadKeyStroke (gST->ConIn, &Key))
+      && Key.ScanCode == SCAN_ESC)
+    return EFI_ABORTED;
+  Now = GetPerformanceCounter ();
+  if (mProgressNow || mVerify != Verify || Done == Total
+      || GetTimeInNanoSecond (Now - mLastProgress) >= 1000000000ULL)
+  {
+    UINT32 Percent = Done == Total ? 100 : (UINT32)MIN (99,
+        (Done >> 10) * 100 / MAX (Total >> 10, 1));
+    UINT64 TotalMib = (Total >> 20) + ((Total & (SIZE_1MB - 1)) != 0);
+    UINT64 DoneMib = Done == Total ? TotalMib : Done >> 20;
+    AsciiSPrint (SerialLine, sizeof (SerialLine),
+                 "\rFastboot %a %a: %Lu/%Lu MiB (%u%%)    ",
+                 mFlashTarget, Verify ? "verify" : "write",
+                 DoneMib, TotalMib, Percent);
+    SerialPortWrite ((UINT8 *)SerialLine, AsciiStrLen (SerialLine));
+    AsciiSPrint (Value, sizeof (Value), "%a %Lu/%Lu MiB",
+                 Verify ? "verifying" : "writing",
+                 DoneMib, TotalMib);
+    Status = Reply ("INFO", Value);
+    mProgressNow = FALSE;
+    mVerify = Verify;
+    mLastProgress = GetPerformanceCounter ();
+  }
+  return Status;
 }
 
 STATIC BOOLEAN
@@ -104,6 +147,7 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   VOID *Download = NULL;
   UINT8 *Packet = NULL;
   UINTN Expected = 0, Done = 0, Size;
+  UINT64 LastData = 0;
   BOOLEAN Complete = FALSE, Exit = FALSE;
   CHAR8 Command[65], Value[64];
 
@@ -140,6 +184,17 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     }
     if (Status == EFI_NOT_READY)
     {
+      if (Expected && GetTimeInNanoSecond (
+              GetPerformanceCounter () - LastData) >= DOWNLOAD_TIMEOUT_NS)
+      {
+        Expected = Done = 0;
+        Complete = FALSE;
+        Print (L"Download timed out; USB session restarted.\r\n");
+        FastbootUsbStop ();
+        Status = FastbootUsbStart ();
+        if (EFI_ERROR (Status))
+          break;
+      }
       MicroSecondDelay (20);
       continue;
     }
@@ -159,6 +214,7 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
       {
         CopyMem ((UINT8 *)Download + Done, Packet, Size);
         Done += Size;
+        LastData = GetPerformanceCounter ();
         if (Done == Expected)
         {
           Expected = 0;
@@ -190,6 +246,7 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
       else
       {
         Expected = (UINTN)Bytes;
+        LastData = GetPerformanceCounter ();
         AsciiSPrint (Value, sizeof (Value), "%08x", (UINT32)Bytes);
         Status = Reply ("DATA", Value);
       }
@@ -229,11 +286,42 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     }
     else if (!AsciiStrnCmp (Command, "flash:", 6))
     {
-      Status = Complete ? FastbootFlash (Command + 6, Download, Done)
-                        : EFI_NOT_READY;
+      if (!Complete)
+      {
+        Status = Reply ("FAIL", "no complete download");
+        if (EFI_ERROR (Status))
+          break;
+        continue;
+      }
+      mProgressNow = TRUE;
+      mFlashTarget = Command + 6;
+      Status = FastbootFlash (Command + 6, Download, Done, FlashProgress);
+      Complete = FALSE;
+      Done = 0;
+      CHAR8 Result[96];
+      AsciiSPrint (Result, sizeof (Result), "\r\nFastboot %a: %r\r\n",
+                   mFlashTarget, Status);
+      SerialPortWrite ((UINT8 *)Result, AsciiStrLen (Result));
+      if (Status == EFI_MEDIA_CHANGED || Status == EFI_TIMEOUT
+          || Status == EFI_NOT_READY)
+      {
+        Print (L"Flash interrupted; USB session restarted.\r\n");
+        FastbootUsbStop ();
+        Status = FastbootUsbStart ();
+        if (EFI_ERROR (Status))
+          break;
+        continue;
+      }
+      if (Status == EFI_ABORTED)
+        Print (L"Flash canceled; restart the complete flash command.\r\n");
       AsciiSPrint (Value, sizeof (Value), "%r", Status);
       Status = Reply (EFI_ERROR (Status) ? "FAIL" : "OKAY",
                       EFI_ERROR (Status) ? Value : "");
+      if (EFI_ERROR (Status))
+      {
+        FastbootUsbStop ();
+        Status = FastbootUsbStart ();
+      }
     }
     else if (!AsciiStrnCmp (Command, "fetch:", 6))
     {

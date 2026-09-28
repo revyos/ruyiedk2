@@ -146,6 +146,8 @@ ControlStatus (VOID)
 STATIC VOID
 SetConfiguration (UINT8 Value)
 {
+  mGeneration++;
+  mTxBusy[BULK_IN] = FALSE;
   mConfiguration = Value;
   mConfigured = Value != 0;
   mRxArmed = mRxReady = FALSE;
@@ -499,10 +501,10 @@ FastbootUsbStop (VOID)
 }
 
 EFI_STATUS
-FastbootUsbReceive (VOID *Buffer, UINTN *Length)
+FastbootUsbPoll (VOID)
 {
-  if (!mStarted || Buffer == NULL || Length == NULL || *Length == 0)
-    return EFI_INVALID_PARAMETER;
+  if (!mStarted)
+    return EFI_NOT_STARTED;
   Poll ();
   if (EFI_ERROR (mError))
     return mError;
@@ -511,8 +513,18 @@ FastbootUsbReceive (VOID *Buffer, UINTN *Length)
     mSeenGeneration = mGeneration;
     return EFI_MEDIA_CHANGED;
   }
-  if (!mConfigured)
-    return EFI_NOT_READY;
+  return mConfigured ? EFI_SUCCESS : EFI_NOT_READY;
+}
+
+EFI_STATUS
+FastbootUsbReceive (VOID *Buffer, UINTN *Length)
+{
+  EFI_STATUS Status;
+  if (Buffer == NULL || Length == NULL || *Length == 0)
+    return EFI_INVALID_PARAMETER;
+  Status = FastbootUsbPoll ();
+  if (EFI_ERROR (Status))
+    return Status;
   if (mRxReady)
   {
     if (*Length < mRxBytes)

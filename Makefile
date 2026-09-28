@@ -481,3 +481,10 @@ edk2-fastboot-storage-check:
 		-Iplatforms/RiscVPlatformPkg/Include tests/edk2-fastboot-nvme.c \
 		-o $(EDK2_BUILD)/test-fastboot-nvme
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-fastboot-nvme
+	$(CC) -g -Wall -Wextra -fsanitize=address,undefined -fshort-wchar \
+		-ffunction-sections -fdata-sections -Wl,--gc-sections \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-Iplatforms/RiscVPlatformPkg/Include tests/edk2-fastboot-progress.c \
+		-o $(EDK2_BUILD)/test-fastboot-progress
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-fastboot-progress
