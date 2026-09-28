@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210PeripheralLib
+  FILE_GUID = 79172264-dba9-4d3a-a4b1-d3d1f43d141c
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = A210PeripheralLib
+[Sources]
+  Resources.c
+  Gpio.c
+  I2c.c
+[Packages]
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  FdtLib
+  HobLib
+  IoLib
+  TimerLib
+  UefiBootServicesTableLib
+[Guids]
+  gFdtHobGuid
