@@ -12,6 +12,8 @@ export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(
   git -C "$edk2_source" show -s --format=%ct HEAD
 )}
 case "${EDK2_BOARD:-meles}" in
+  melonpi|melonpi-v1|melonpi-v2)
+    platform=MelonPiPkg/MelonPi.dsc ;;
   meles) platform=MelesPkg/Meles.dsc ;;
   meles-recovery) platform=MelesPkg/MelesRecovery.dsc ;;
   lpi4a) platform=Lpi4aPkg/Lpi4a.dsc ;;

@@ -1,6 +1,6 @@
 # TH1520 EDK2 HDMI
 
-`Th1520Pkg/Drivers/DisplayDxe` renders into a linear framebuffer and
+`RiscVPlatformPkg/Drivers/Dc8200Dxe` renders into a linear framebuffer and
 uses DC8200 output 1 with the DesignWare HDMI transmitter and PHY.
 It requires enabled `thead,th1520-dc8200` and `thead,th1520-dw-hdmi`
 nodes at the SoC addresses. Meles and LPi4A share the driver.
@@ -122,3 +122,15 @@ for cold-start and shadow-register handling. A210 sequences are not used.
 Copied register definitions and adapted hardware sequences retain their
 GPL licensing and attribution. Console integration uses the existing
 GraphicsConsoleDxe, FrameBufferBltLib and BootLogoLib.
+
+## Platform separation
+
+`DisplayPlatformLib` supplies device discovery, clock gates, resets,
+pin setup and pixel-clock dividers. TH1520 retains its existing register
+sequence in `Th1520Pkg/Library/DisplayPlatformLib`. A210 uses its own VO
+registers and the vendor Gen2 PHY swing settings for 1080p.
+
+`DisplayConsoleLib` registers GOP console paths alongside the serial
+console and preserves the EDID-selected resolution in setup. Both boot
+managers use this helper. EDID parsing, DC8200 scanout, DW-HDMI packet
+configuration and GOP operations remain in the shared driver.

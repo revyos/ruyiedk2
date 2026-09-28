@@ -10,7 +10,11 @@ EDK2_BUILD := $(BUILD)/$(EDK2_BOARD)
 # Existing packaged images/DTBs are inputs to optional integration checks.
 FIRMWARE_BUILD ?= $(abspath ../build)
 
-ifeq ($(EDK2_BOARD),meles)
+EDK2_FD := TH1520.fd
+ifneq ($(filter $(EDK2_BOARD),melonpi melonpi-v1 melonpi-v2),)
+EDK2_PLATFORM := MelonPi
+EDK2_FD := A210.fd
+else ifeq ($(EDK2_BOARD),meles)
 EDK2_PLATFORM := Meles
 EDK2_BOOT := spi-nor
 EDK2_IMAGE := meles-edk2-spi.bin
@@ -39,8 +43,8 @@ edk2-firmware: basetools
 	tools/build.sh
 	mkdir -p $(EDK2_BUILD)
 	cp \
-		$(BUILD)/Build/$(EDK2_PLATFORM)/$(EDK2_TARGET)_GCC/FV/TH1520.fd \
-		$(EDK2_BUILD)/TH1520.fd
+		$(BUILD)/Build/$(EDK2_PLATFORM)/$(EDK2_TARGET)_GCC/FV/$(EDK2_FD) \
+		$(EDK2_BUILD)/$(EDK2_FD)
 
 edk2-lpi4a:
 	$(MAKE) edk2 EDK2_BOARD=lpi4a
@@ -70,18 +74,23 @@ edk2-display-check:
 	mkdir -p $(EDK2_BUILD)
 	$(CC) -g -Wall -Wextra -fsanitize=address,undefined -fshort-wchar \
 		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+		-Iplatforms/RiscVPlatformPkg/Include \
 		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
 		tests/edk2-display.c \
-		platforms/Th1520Pkg/Drivers/DisplayDxe/Edid.c \
+		platforms/RiscVPlatformPkg/Drivers/Dc8200Dxe/Edid.c \
 		-o $(EDK2_BUILD)/test-display
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-display
 	$(CC) -g -Wall -Wextra -fsanitize=address,undefined -fshort-wchar \
 		-ffunction-sections -fdata-sections -Wl,--gc-sections \
 		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+		-Iplatforms/RiscVPlatformPkg/Include \
 		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
 		-Iplatforms/Th1520Pkg/Include tests/edk2-display-hw.c \
-		platforms/Th1520Pkg/Drivers/DisplayDxe/Hardware.c \
-		platforms/Th1520Pkg/Drivers/DisplayDxe/Edid.c \
+		platforms/RiscVPlatformPkg/Drivers/Dc8200Dxe/Hardware.c \
+		platforms/Th1520Pkg/Library/DisplayPlatformLib/Platform.c \
+		platforms/RiscVPlatformPkg/Drivers/Dc8200Dxe/Edid.c \
 		-o $(EDK2_BUILD)/test-display-hw
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-display-hw
 
@@ -266,6 +275,8 @@ edk2-hotplug-check:
 	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
 		-ffunction-sections -fdata-sections -Wl,--gc-sections \
 		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+		-Iplatforms/RiscVPlatformPkg/Include \
 		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
 		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
 		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
@@ -391,3 +402,63 @@ edk2-ip4-form-check:
 		$(EDK2_SOURCE)/NetworkPkg/Library/DxeNetLib/DxeNetLib.c \
 		-o $(EDK2_BUILD)/test-ip4-form
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-ip4-form
+
+.PHONY: edk2-a210-display-check
+check: edk2-a210-display-check
+edk2-a210-display-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
+		-ffunction-sections -fdata-sections -Wl,--gc-sections \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+		-Iplatforms/RiscVPlatformPkg/Include -Iplatforms/A210Pkg/Include \
+		tests/edk2-display-a210.c \
+		platforms/A210Pkg/Library/DisplayPlatformLib/Platform.c \
+		-o $(EDK2_BUILD)/test-a210-display
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-a210-display
+
+.PHONY: edk2-a210-pci-check
+check: edk2-a210-pci-check
+edk2-a210-pci-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
+		-ffunction-sections -fdata-sections -Wl,--gc-sections \
+		-DMDEPKG_NDEBUG -I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
+		-Iplatforms/A210Pkg/Include tests/edk2-a210-pci.c \
+		platforms/A210Pkg/Library/PciSegmentLib/PciSegment.c \
+		$(EDK2_SOURCE)/MdePkg/Library/BaseLib/BitField.c \
+		-o $(EDK2_BUILD)/test-a210-pci
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-a210-pci
+
+.PHONY: edk2-cpu-io-space-check
+check: edk2-cpu-io-space-check
+edk2-cpu-io-space-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
+		-DMDEPKG_NDEBUG -I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
+		-I$(EDK2_SOURCE)/UefiCpuPkg/Include \
+		-I$(EDK2_SOURCE)/EmbeddedPkg/Include \
+		-I$(EDK2_SOURCE)/OvmfPkg/Include \
+		-Iplatforms/RiscVPlatformPkg/Include \
+		tests/edk2-cpu-io-space.c \
+		platforms/RiscVPlatformPkg/Library/PlatformSecLib/Cpu.c \
+		-lfdt -o $(EDK2_BUILD)/test-cpu-io-space
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-cpu-io-space
+
+.PHONY: edk2-a210-dma-policy-check
+check: edk2-a210-dma-policy-check
+edk2-a210-dma-policy-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
+		-ffunction-sections -fdata-sections -Wl,--gc-sections \
+		-DMDEPKG_NDEBUG -I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-I$(EDK2_SOURCE)/MdeModulePkg/Include \
+		-Iplatforms/A210Pkg/Include tests/edk2-a210-dma-policy.c \
+		-o $(EDK2_BUILD)/test-a210-dma-policy
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-a210-dma-policy

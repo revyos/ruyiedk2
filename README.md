@@ -1,6 +1,7 @@
 # TH1520 EDK2
 
-EDK2 platform support for Milk-V Meles and Sipeed Lichee Pi 4A.
+EDK2 platform support for Milk-V Meles, Sipeed Lichee Pi 4A and
+Zhihe A210 Melon Pi V1 and V2.
 
 - `platforms/Th1520Pkg/`: shared drivers, libraries, Fastboot and boot UI.
 - `platforms/MelesPkg/`: Meles board configuration.
@@ -96,3 +97,6 @@ Files retain their SPDX identifiers and copyright notices. The
 [logo documentation](platforms/Th1520Pkg/Drivers/LogoDxe/README.md)
 records the openRuyi artwork source and attribution.
 Hardware validation and its limits are recorded in the feature guides.
+
+See [Melon Pi / A210](docs/melonpi.md) for native RAM boot and USB
+Fastboot support.
