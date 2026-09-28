@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210CpuDmaDxe
+  FILE_GUID = 962a64da-7047-43cc-9d79-4e6b67ecdc4a
+  MODULE_TYPE = DXE_DRIVER
+  ENTRY_POINT = CpuDmaInitialize
+[Sources]
+  CpuDma.c
+[Packages]
+  MdePkg/MdePkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  A210PeripheralLib
+  BaseLib
+  DebugLib
+  DxeServicesTableLib
+  FdtLib
+  MemoryAllocationLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gEfiCpuArchProtocolGuid
+[Depex]
+  gEfiCpuArchProtocolGuid
