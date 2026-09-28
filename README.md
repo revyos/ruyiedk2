@@ -94,7 +94,7 @@ external firmware. For EFI I/O benchmarks, see
 
 The platform originated in the TH1520 workspace at `74380f02774d`.
 Files retain their SPDX identifiers and copyright notices. The
-[logo documentation](platforms/Th1520Pkg/Drivers/LogoDxe/README.md)
+[logo documentation](platforms/RiscVPlatformPkg/Drivers/LogoDxe/README.md)
 records the openRuyi artwork source and attribution.
 Hardware validation and its limits are recorded in the feature guides.
 

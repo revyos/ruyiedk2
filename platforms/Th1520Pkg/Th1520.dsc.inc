@@ -37,6 +37,7 @@
   Th1520MacStoreLib|Th1520Pkg/Library/MacStoreLib/MacStoreLib.inf
   Th1520NvStoreLib|Th1520Pkg/Library/NvStoreLib/NvStoreLib.inf
   Th1520SpiLib|Th1520Pkg/Library/SpiLib/SpiLib.inf
+  BootProgressLib|RiscVPlatformPkg/Library/BootProgressLib/BootProgressLib.inf
   BootLogoLib|MdeModulePkg/Library/BootLogoLib/BootLogoLib.inf
   FrameBufferBltLib|MdeModulePkg/Library/FrameBufferBltLib/FrameBufferBltLib.inf
   Th1520BoardLib|$(BOARD_LIBRARY)
@@ -168,7 +169,7 @@
   Th1520Pkg/Drivers/MacConfigDxe/MacConfigDxe.inf
   Th1520Pkg/Drivers/Ip4ConfigDxe/Ip4ConfigDxe.inf
   RiscVPlatformPkg/Drivers/Dc8200Dxe/DisplayDxe.inf
-  Th1520Pkg/Drivers/LogoDxe/LogoDxe.inf
+  RiscVPlatformPkg/Drivers/LogoDxe/LogoDxe.inf
   MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
   RiscVPlatformPkg/Drivers/SoftwareRngDxe/SoftwareRngDxe.inf
   MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf

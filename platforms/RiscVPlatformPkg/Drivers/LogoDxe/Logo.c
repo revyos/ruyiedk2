@@ -9,7 +9,8 @@
 
 STATIC EFI_STATUS EFIAPI
 GetImage (EDKII_PLATFORM_LOGO_PROTOCOL *This, UINT32 *Instance,
-          EFI_IMAGE_INPUT *Image, EDKII_PLATFORM_LOGO_DISPLAY_ATTRIBUTE *Attribute,
+          EFI_IMAGE_INPUT *Image,
+          EDKII_PLATFORM_LOGO_DISPLAY_ATTRIBUTE *Attribute,
           INTN *OffsetX, INTN *OffsetY)
 {
   VOID *Bmp;
@@ -25,7 +26,8 @@ GetImage (EDKII_PLATFORM_LOGO_PROTOCOL *This, UINT32 *Instance,
   {
     return EFI_NOT_FOUND;
   }
-  Status = GetSectionFromAnyFv (&gTh1520OpenRuyiLogoGuid, EFI_SECTION_RAW, 0, &Bmp, &Size);
+  Status = GetSectionFromAnyFv (&gOpenRuyiLogoGuid, EFI_SECTION_RAW,
+                               0, &Bmp, &Size);
   if (EFI_ERROR (Status))
   {
     return Status;

@@ -17,3 +17,6 @@
   EqosPlatformLib|Include/Library/EqosPlatformLib.h
   DisplayPlatformLib|Include/Library/DisplayPlatformLib.h
   DisplayConsoleLib|Include/Library/DisplayConsoleLib.h
+  BootProgressLib|Include/Library/BootProgressLib.h
+[Guids]
+  gOpenRuyiLogoGuid = {0xb9317e41, 0x2a84, 0x4d83, {0x8e, 0x31, 0xa6, 0x78, 0x38, 0x81, 0x5f, 0xf2}}

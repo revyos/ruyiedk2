@@ -23,13 +23,11 @@
   DisplayConsoleLib
   Th1520MacStoreLib
   UefiRuntimeServicesTableLib
-  BootLogoLib
+  BootProgressLib
   BaseMemoryLib
   DevicePathLib
   MemoryAllocationLib
   PcdLib
-  PrintLib
-  SerialPortLib
   UefiBootManagerLib
   UefiBootServicesTableLib
   UefiLib
@@ -39,7 +37,6 @@
   gEdkiiPlatformHasDeviceTreeGuid
   gEfiEndOfDxeEventGroupGuid
   gEfiGlobalVariableGuid
-  gEfiEventReadyToBootGuid
 [Protocols]
   gTh1520MacStoreProtocolGuid
   gEfiGraphicsOutputProtocolGuid
@@ -48,7 +45,6 @@
 
 [Pcd]
   gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
-  gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut
   gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile
   gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution
   gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution

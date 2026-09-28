@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-2-Clause-Patent
 [Defines]
   INF_VERSION = 0x0001001b
-  BASE_NAME = Th1520LogoDxe
+  BASE_NAME = OpenRuyiLogoDxe
   FILE_GUID = 9a163d8c-77f3-4eae-a8b2-a4a798c62871
   MODULE_TYPE = DXE_DRIVER
   VERSION_STRING = 1.0
@@ -11,7 +11,7 @@
 [Packages]
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
-  Th1520Pkg/Th1520Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
 [LibraryClasses]
   BmpSupportLib
   DxeServicesLib
@@ -21,6 +21,6 @@
 [Protocols]
   gEdkiiPlatformLogoProtocolGuid
 [Guids]
-  gTh1520OpenRuyiLogoGuid
+  gOpenRuyiLogoGuid
 [Depex]
   TRUE
