@@ -74,6 +74,11 @@ INF MdeModulePkg/Universal/StatusCodeHandler/RuntimeDxe/StatusCodeHandlerRuntime
 
 INF RiscVPlatformPkg/Drivers/SoftwareRngDxe/SoftwareRngDxe.inf
 INF RiscVPlatformPkg/Drivers/Dc8200Dxe/DisplayDxe.inf
+INF RiscVPlatformPkg/Drivers/LogoDxe/LogoDxe.inf
+INF MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
+FILE FREEFORM = b9317e41-2a84-4d83-8e31-a67838815ff2 {
+  SECTION RAW = RiscVPlatformPkg/Drivers/LogoDxe/openRuyi.bmp
+}
 INF RiscVPlatformPkg/Drivers/DwMac4Dxe/DwMac4Dxe.inf
 !include NetworkPkg/Network.fdf.inc
 

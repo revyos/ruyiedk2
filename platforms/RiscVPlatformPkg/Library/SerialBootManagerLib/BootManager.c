@@ -3,6 +3,7 @@
 #include <Library/BaseMemoryLib.h>
 #include <Library/DevicePathLib.h>
 #include <Library/DisplayConsoleLib.h>
+#include <Library/BootProgressLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PcdLib.h>
 #include <Library/UefiBootManagerLib.h>
@@ -223,18 +224,13 @@ PlatformBootManagerAfterConsole (VOID)
   EfiBootManagerConnectAll ();
   EfiBootManagerConnectAllDefaultConsoles ();
   EfiBootManagerRefreshAllBootOption ();
-  Print (L"%s\r\n", PcdGetPtr (PcdFirmwareVersionString));
-  Print (L"Enter: Boot  F2: Setup  F9: Fastboot  F12: Boot Menu\r\n");
+  BootProgressStart ();
 }
 
 VOID EFIAPI
 PlatformBootManagerWaitCallback (UINT16 Remaining)
 {
-  Print (L"\rBooting in %2u seconds...", Remaining);
-  if (Remaining == 0)
-  {
-    Print (L"\r\n");
-  }
+  BootProgressUpdate (Remaining);
 }
 
 VOID EFIAPI

@@ -14,6 +14,7 @@
   EmbeddedPkg/EmbeddedPkg.dec
 [LibraryClasses]
   DisplayConsoleLib
+  BootProgressLib
   BaseMemoryLib
   DevicePathLib
   MemoryAllocationLib
@@ -28,4 +29,3 @@
   gEfiLoadedImageProtocolGuid
 [Pcd]
   gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFirmwareVersionString

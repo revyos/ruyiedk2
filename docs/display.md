@@ -41,7 +41,9 @@ keep that mode. Text dimensions remain 80x25, with the standard Console
 Splitter mirroring output to HDMI and serial. The GOP uses a vendor
 controller device path directly so BDS can connect its console.
 
-LogoDxe supplies the openRuyi bitmap to BootLogoLib. The standard BDS
+The shared LogoDxe supplies the openRuyi bitmap to BootLogoLib on both
+TH1520 and A210. BootProgressLib renders the same logo, hotkey title and
+progress bar while retaining the serial countdown. The standard BDS
 countdown provides the ten-second timeout and F2/F9/F12 hotkeys.
 Enter skips the remaining countdown and continues normal boot without
 changing the saved timeout or boot order. It uses BDS's continue-key

@@ -38,6 +38,7 @@
   FastbootPlatformLib|A210Pkg/Library/FastbootPlatformLib/FastbootPlatformLib.inf
   FastbootTransportLib|RiscVPlatformPkg/Library/Dwc2FastbootLib/Dwc2FastbootLib.inf
   UsbDevicePlatformLib|A210Pkg/Library/UsbDevicePlatformLib/UsbDevicePlatformLib.inf
+  BootProgressLib|RiscVPlatformPkg/Library/BootProgressLib/BootProgressLib.inf
   BootLogoLib|MdeModulePkg/Library/BootLogoLib/BootLogoLib.inf
   FrameBufferBltLib|MdeModulePkg/Library/FrameBufferBltLib/FrameBufferBltLib.inf
   NonDiscoverableDeviceRegistrationLib|MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.inf
@@ -200,6 +201,8 @@
 
 [Components]
   RiscVPlatformPkg/Drivers/Dc8200Dxe/DisplayDxe.inf
+  RiscVPlatformPkg/Drivers/LogoDxe/LogoDxe.inf
+  MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
 
   A210Pkg/Drivers/UsbHostDxe/UsbHostDxe.inf
   RiscVPlatformPkg/Drivers/Dwc2HostDxe/Dwc2HostDxe.inf {
