@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210PciHostBridgeLib
+  FILE_GUID = 3e8a8ba8-cf2c-411b-8b50-0c85225c54b0
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = PciHostBridgeLib
+[Sources]
+  PciHostBridge.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  A210PciLib
+  DebugLib
+  MemoryAllocationLib
+[Protocols]
+  gEdkiiIoMmuProtocolGuid
+[Depex]
+  gEdkiiIoMmuProtocolGuid

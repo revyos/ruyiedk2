@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210PciSegmentLib
+  FILE_GUID = fef0ce3e-c030-40f7-9d7a-522832bc9f46
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = PciSegmentLib
+[Sources]
+  PciSegment.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  A210PciLib
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  UefiBootServicesTableLib

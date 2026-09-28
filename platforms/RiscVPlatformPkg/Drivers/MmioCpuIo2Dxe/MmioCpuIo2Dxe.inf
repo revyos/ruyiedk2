@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = MmioCpuIo2Dxe
+  FILE_GUID = 34f094c2-bf11-4e2a-9cbd-e9066826c9dc
+  MODULE_TYPE = DXE_DRIVER
+  ENTRY_POINT = MmioCpuIoInitialize
+[Sources]
+  MmioCpuIo2.c
+[Packages]
+  MdePkg/MdePkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  IoLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Protocols]
+  gEfiCpuIo2ProtocolGuid
+[Depex]
+  TRUE
