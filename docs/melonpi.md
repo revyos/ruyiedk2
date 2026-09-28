@@ -153,14 +153,20 @@ Supported storage names:
 
 | Name | Target |
 | --- | --- |
+| `emmc0` | Entire eMMC user area, including its partition table |
 | `emmc0boot0` | Raw first eMMC boot area (Linux boot0) |
 | `emmc0boot1` | Raw second eMMC boot area (Linux boot1) |
+| `nvme0n1` | NVMe controller 0, namespace 1, including its GPT |
 
 Storage sizes come from Block I/O, not from an assumed eMMC capacity.
 Flash writes are bounded to the selected area, padded to a sector with
 `0xff`, flushed, and read back before returning success. The boot
-partition selection is preserved. These names map directly to the two
-hardware boot areas; no image format is imposed and no aliases are used.
+partition selection is preserved. The eMMC names map directly to hardware
+areas. NVMe controllers are
+numbered by ascending PCI segment/bus/device/function, with the hardware
+namespace ID after `n`. The console prints their PCI addresses and sizes.
+Only whole namespaces are exposed, not GPT partitions. Numbering follows
+this firmware's discovery and need not match Linux when controllers change.
 
 Example commands:
 
@@ -174,8 +180,49 @@ fastboot continue
 
 Use a complete image built for eMMC boot0 when updating `emmc0boot0`.
 `A210.fd` is an EDK2 payload, and the OCRAM RVBL image is a RAM loader;
-neither is an eMMC boot0 image. Sparse images are not decoded; use
+neither is an eMMC boot0 image. Boot areas accept raw images only; use
 `-S 0` for raw firmware files.
+
+For a full GPT operating-system image, select a user disk:
+
+```sh
+fastboot getvar partition-size:emmc0
+fastboot getvar partition-size:nvme0n1
+fastboot flash emmc0 openruyi-rva20.img
+# Or install the same image on the NVMe namespace:
+fastboot flash nvme0n1 openruyi-rva20.img
+```
+
+These commands replace the selected disk's partitions and data. They do
+not write the eMMC hardware boot areas. The host automatically splits
+large raw files into Android sparse downloads within the 128 MiB limit.
+Do not use `-S 0` for disk images larger than that limit. Filesystem holes
+in the host file do not change its raw disk format;
+no manual img2simg conversion is needed.
+
+User disks accept sparse v1 RAW, FILL and DONT_CARE chunks. All chunk
+bounds and the expanded image size are checked before any write in each
+download. DONT_CARE preserves existing sectors, including earlier sparse
+downloads. Nonzero header checksums and CRC32 chunks are rejected before
+writing; standard fastboot resparse downloads omit these optional checks.
+Writes are flushed, then written ranges are read back and compared. The
+complete multi-download operation is not atomic. Restart the full flash
+command if it is interrupted, and reboot before using the new GPT.
+
+Writing and verification report progress through standard Fastboot INFO
+responses and the serial port. Serial output shows the target, phase,
+completed MiB and percentage on one updating line. Progress does not
+redraw the HDMI console. Counters cover the current download; the host
+reports the full-image chunk count. Esc cancels at the next block-transfer
+boundary and leaves Fastboot available. USB reset/disconnect or a response timeout stops the
+operation and restarts the USB session, invalidating the old download.
+A download stalled for five seconds is discarded and the USB session
+is restarted as well. Host Ctrl+C has no protocol-level cancel message;
+periodic responses detect a vanished host through the transport timeout. Cancellation
+may leave partial disk contents and cannot interrupt an active Block I/O
+call before that driver completes or times out. On V1, a host SIGINT test
+recovered a product query in 7.8 seconds; serial Esc recovered it in
+2.5 seconds. Neither test required a board reset.
 
 To execute a PE/COFF EFI application from RAM:
 
@@ -196,6 +243,18 @@ Boot1 was restored and compared byte-for-byte with its original content.
 The complete coreboot boot0 image was flashed through `emmc0boot0`.
 After a global reset, the eMMC boot0 chain reached EDK2 with AON
 running and both CPU clusters measured at 1.896 GHz.
+
+V1 also passed full disk-image flashing and boot tests with coreboot
+26.09 and Linux 7.3-rc4. Separate 4 GiB openRuyi images with distinct
+filesystem and GPT UUIDs were written to `emmc0` and `nvme0n1`. Before
+OS startup, SHA-256 of each disk's first 4 GiB matched its source image.
+
+Each device was then selected explicitly in Boot Menu. GRUB temporarily
+received `console=ttyS4,115200 earlycon`; the generic image defaults were
+kept unchanged. Both systems reached multi-user.target, accepted serial
+login and reported CPUs 0-7 online and systemd state `running`. The root
+mounts were `mmcblk0p2` and `nvme0n1p2`, respectively. First boot expanded
+the filesystems to approximately 57 GiB on eMMC and 469 GiB on NVMe.
 
 ## Setup information and boot options
 
