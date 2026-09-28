@@ -462,3 +462,22 @@ edk2-a210-dma-policy-check:
 		-Iplatforms/A210Pkg/Include tests/edk2-a210-dma-policy.c \
 		-o $(EDK2_BUILD)/test-a210-dma-policy
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-a210-dma-policy
+
+.PHONY: edk2-fastboot-storage-check
+check: edk2-fastboot-storage-check
+edk2-fastboot-storage-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -Wall -Wextra -fsanitize=address,undefined -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-Iplatforms/RiscVPlatformPkg/Include \
+		tests/edk2-fastboot-storage.c \
+		platforms/RiscVPlatformPkg/Library/FastbootStorageLib/Image.c \
+		-o $(EDK2_BUILD)/test-fastboot-storage
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-fastboot-storage
+	$(CC) -g -Wall -Wextra -fsanitize=address,undefined -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-Iplatforms/RiscVPlatformPkg/Include tests/edk2-fastboot-nvme.c \
+		-o $(EDK2_BUILD)/test-fastboot-nvme
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-fastboot-nvme
