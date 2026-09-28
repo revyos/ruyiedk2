@@ -7,6 +7,7 @@
 [Includes]
   Include
 [LibraryClasses]
+  Dwc2HostPlatformLib|Include/Library/Dwc2HostPlatformLib.h
   PlatformResourceLib|Include/Library/PlatformResourceLib.h
   FastbootTransportLib|Include/Library/FastbootTransportLib.h
   FastbootPlatformLib|Include/Library/FastbootPlatformLib.h

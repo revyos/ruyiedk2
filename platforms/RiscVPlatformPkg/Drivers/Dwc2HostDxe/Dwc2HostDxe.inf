@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Dwc2HostDxe
+  FILE_GUID = 073f61b3-42f4-44d0-9d34-e119aeb096c3
+  MODULE_TYPE = UEFI_DRIVER
+  ENTRY_POINT = DwUsbHostEntryPoint
+[Sources]
+  DwcHw.h
+  DwUsbHostDxe.h
+  DwUsbHostDxe.c
+  DriverBinding.c
+  ComponentName.c
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
+[LibraryClasses]
+  MemoryAllocationLib
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  DevicePathLib
+  DmaLib
+  Dwc2HostPlatformLib
+  IoLib
+  ReportStatusCodeLib
+  TimerLib
+  UefiLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Guids]
+  gEfiEventExitBootServicesGuid
+[Protocols]
+  gEfiDriverBindingProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gEfiUsb2HcProtocolGuid
