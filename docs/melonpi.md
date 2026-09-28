@@ -71,6 +71,19 @@ have verified USB3 on V1 with the independent VBUS switch and a matching
 plug orientation. This does not provide automatic Type-C operation.
 FANG enclosure startup remains unreliable. The separate Lexar drive
 has passed EDK2 transfers and EFI boot in the fixed-host configuration.
+V2 uses FUSB302 for its USB3 Type-C connector. EDK2 follows the DT graph
+from the controller and PHY to that connector, detects either plug
+orientation and enables the DT-described VBUS supply after CC debounce.
+The boot-time policy is a 5 V host with default USB current. PD role
+swaps, higher voltages, VCONN and DisplayPort are left to Linux.
+
+Detection is a timer-driven state machine with one I2C transfer per
+notification. Each transfer has a 2 ms total deadline; errors stop port
+polling without stopping boot. The next notification is scheduled only
+after the previous one finishes. DT resources are resolved before
+polling. ExitBootServices stops notifications and preserves the active
+connection for Linux, whose DT retains role and orientation switching.
+
 eMMC, Ethernet and HDMI use shared drivers. V1 has passed coreboot/EDK2
 boot, Fastboot, NVMe and USB tests. The V2 results were obtained on
 the minor revision previously called V3.

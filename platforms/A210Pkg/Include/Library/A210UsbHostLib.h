@@ -3,4 +3,6 @@
 #define A210_USB_HOST_LIB_H_
 #include <Uefi.h>
 EFI_STATUS A210UsbHostInit (BOOLEAN Usb3, UINTN *Base);
+EFI_STATUS A210UsbHostPoll (VOID);
+VOID A210UsbHostStop (VOID);
 #endif

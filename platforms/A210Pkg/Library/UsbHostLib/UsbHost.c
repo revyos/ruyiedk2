@@ -9,6 +9,7 @@
 #include <Library/FdtLib.h>
 #include <Library/IoLib.h>
 #include <Library/TimerLib.h>
+#include "Typec.h"
 
 #define USB_CLOCK_COMMON (A210_USB_CPR_BASE + 0x00)
 #define USB_RESET_COMMON (A210_USB_CPR_BASE + 0x100)
@@ -52,6 +53,8 @@
 #define TCA_TCPC 0x14
 #define TCA_TCPC_VALID BIT4
 #define TCA_TCPC_USB BIT0
+#define TCA_TCPC_LOW_POWER BIT3
+#define TCA_TCPC_FLIP BIT2
 #define TCA_SYSTEM 0x18
 #define TCA_SYSTEM_DISABLE BIT3
 #define TCA_SYSTEM_FLIP BIT2
@@ -64,9 +67,43 @@
 #define DWC3_HOST (1U << 12)
 #define DWC3_PORT_CAP (3U << 12)
 
+STATIC UINTN mTca;
+
+VOID
+A210UsbOrientation (FUSB302_ORIENTATION Orientation)
+{
+  MmioAnd32 (mTca + TCA_GLOBAL, ~TCA_MODE_MASK);
+  MmioOr32 (mTca + TCA_SYSTEM, TCA_SYSTEM_DISABLE);
+  MicroSecondDelay (10);
+  MmioAndThenOr32 (mTca + TCA_SYSTEM,
+                   ~(TCA_SYSTEM_FLIP | TCA_SYSTEM_CONNECTION),
+                   TCA_SYSTEM_CONNECTION
+                   | (Orientation == Fusb302Cc2 ? TCA_SYSTEM_FLIP : 0));
+  MicroSecondDelay (10);
+  MmioAnd32 (mTca + TCA_SYSTEM, ~TCA_SYSTEM_DISABLE);
+  MmioAndThenOr32 (mTca + TCA_GLOBAL, ~TCA_MODE_MASK, TCA_SYNC_MODE);
+  MmioWrite32 (mTca + TCA_IRQ_STATUS, 0xffff);
+  MmioWrite32 (mTca + TCA_TCPC, TCA_TCPC_VALID
+                | (Orientation == Fusb302Detached ? TCA_TCPC_LOW_POWER
+                                                   : TCA_TCPC_USB)
+                | (Orientation == Fusb302Cc2 ? TCA_TCPC_FLIP : 0));
+}
+
+EFI_STATUS
+A210UsbHostPoll (VOID)
+{
+  return A210TypecPoll ();
+}
+
+VOID
+A210UsbHostStop (VOID)
+{
+  A210TypecStop ();
+}
+
 STATIC EFI_STATUS
 PhyRegisters (CONST VOID *Fdt, INT32 Node, UINTN Index,
-              CONST CHAR8 *Compatible, UINTN *Base)
+              CONST CHAR8 *Compatible, BOOLEAN Switched, UINTN *Base)
 {
   CONST UINT32 *Phys;
   UINTN Size;
@@ -79,7 +116,7 @@ PhyRegisters (CONST VOID *Fdt, INT32 Node, UINTN Index,
       || !A210PropertyIs (Fdt, Phy, "compatible", Compatible))
     return EFI_UNSUPPORTED;
   // A fixed host uses the normal routing; a TCPC must own DRD switching.
-  if (FdtGetProp (Fdt, Phy, "orientation-switch", NULL))
+  if (!Switched && FdtGetProp (Fdt, Phy, "orientation-switch", NULL))
     return EFI_UNSUPPORTED;
   return A210Reg (Fdt, Phy, 0, Base, &Size);
 }
@@ -91,22 +128,27 @@ A210UsbHostInit (BOOLEAN Usb3, UINTN *Base)
   INT32 Node = -1;
   UINTN Size, Phy, Tca;
   EFI_STATUS Status;
+  BOOLEAN Typec;
   CONST CHAR8 *Compatible = Usb3 ? "zhihe,a210-dwc3"
                                  : "zhihe,a210-usb";
   if (!Fdt || !Base)
     return EFI_INVALID_PARAMETER;
   while ((Node = FdtNodeOffsetByCompatible (Fdt, Node, Compatible)) >= 0)
     if (A210NodeEnabled (Fdt, Node)
-        && A210PropertyIs (Fdt, Node, "dr_mode", "host"))
+        && (A210PropertyIs (Fdt, Node, "dr_mode", "host")
+            || (Usb3 && A210PropertyIs (Fdt, Node, "dr_mode", "otg")
+                && FdtGetProp (Fdt, Node, "usb-role-switch", NULL))))
       break;
   if (Node < 0)
     return EFI_NOT_FOUND;
+  Typec = Usb3 && FdtGetProp (Fdt, Node, "usb-role-switch", NULL);
   Status = A210Reg (Fdt, Node, 0, Base, &Size);
   if (EFI_ERROR (Status) || Size < 0x10000
       || *Base != (Usb3 ? A210_USB3_BASE : A210_USB2_HOST_BASE))
     return EFI_UNSUPPORTED;
   Status = PhyRegisters (Fdt, Node, 0,
-      Usb3 ? "zhihe,a210-usb31-usb2-phy" : "zhihe,a210-usb2-phy1", &Phy);
+      Usb3 ? "zhihe,a210-usb31-usb2-phy" : "zhihe,a210-usb2-phy1",
+      FALSE, &Phy);
   if (EFI_ERROR (Status))
     return Status;
   if (Phy != (Usb3 ? (A210_USB31_SYSREG_BASE + 0x80)
@@ -114,14 +156,24 @@ A210UsbHostInit (BOOLEAN Usb3, UINTN *Base)
     return EFI_UNSUPPORTED;
   if (Usb3)
   {
-    Status = PhyRegisters (Fdt, Node, 1, "zhihe,a210-c10-phy", &Tca);
+    Status = PhyRegisters (Fdt, Node, 1, "zhihe,a210-c10-phy",
+                           Typec, &Tca);
     if (EFI_ERROR (Status) || Tca != A210_USB_C10_BASE)
       return EFI_UNSUPPORTED;
+    mTca = Tca;
+    if (Typec)
+    {
+      CONST UINT32 *Phys = FdtGetProp (Fdt, Node, "phys", NULL);
+      INT32 PhyNode = FdtNodeOffsetByPhandle (Fdt, A210Cell (Phys + 1));
+      Status = A210TypecInit (Fdt, Node, PhyNode);
+      if (EFI_ERROR (Status))
+        return Status;
+    }
   }
   Status = A210GpioHogs (Fdt);
   if (EFI_ERROR (Status))
     return Status;
-  Status = A210Supply (Fdt, Node, "vbus-supply");
+  Status = Typec ? EFI_SUCCESS : A210Supply (Fdt, Node, "vbus-supply");
   // Explicit fixed-host DTs may provide VBUS through a GPIO hog.
   if (EFI_ERROR (Status) && Status != EFI_NOT_FOUND)
     return Status;
@@ -161,17 +213,7 @@ A210UsbHostInit (BOOLEAN Usb3, UINTN *Base)
   MmioAnd32 (Tca + TCA_CLOCK_RESET, ~TCA_RESET_RELEASE);
   MicroSecondDelay (100);
   MmioOr32 (Tca + TCA_CLOCK_RESET, TCA_RESET_RELEASE);
-  MmioAnd32 (Tca + TCA_GLOBAL, ~TCA_MODE_MASK);
-  MmioOr32 (Tca + TCA_SYSTEM, TCA_SYSTEM_DISABLE);
-  MicroSecondDelay (10);
-  MmioAndThenOr32 (Tca + TCA_SYSTEM,
-                   ~(TCA_SYSTEM_FLIP | TCA_SYSTEM_CONNECTION),
-                   TCA_SYSTEM_CONNECTION);
-  MicroSecondDelay (10);
-  MmioAnd32 (Tca + TCA_SYSTEM, ~TCA_SYSTEM_DISABLE);
-  MmioAndThenOr32 (Tca + TCA_GLOBAL, ~TCA_MODE_MASK, TCA_SYNC_MODE);
-  MmioWrite32 (Tca + TCA_IRQ_STATUS, 0xffff);
-  MmioWrite32 (Tca + TCA_TCPC, TCA_TCPC_VALID | TCA_TCPC_USB);
+  A210UsbOrientation (Typec ? Fusb302Detached : Fusb302Cc1);
   MmioOr32 (USB_C10_RESET, C10_PHY_RESET);
   MmioOr32 (USB31_RESET, USB31_PHY_RESET | USB31_CORE_RESET);
   MicroSecondDelay (1000);

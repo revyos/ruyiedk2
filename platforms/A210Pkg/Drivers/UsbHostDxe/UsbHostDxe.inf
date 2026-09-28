@@ -16,6 +16,9 @@
   DebugLib
   NonDiscoverableDeviceRegistrationLib
   UefiDriverEntryPoint
+  UefiBootServicesTableLib
+[Guids]
+  gEfiEventExitBootServicesGuid
 [Depex]
   gEfiCpuArchProtocolGuid
 [Protocols]

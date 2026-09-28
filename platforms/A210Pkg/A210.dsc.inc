@@ -25,6 +25,7 @@
   PciHostBridgeLib|A210Pkg/Library/PciHostBridgeLib/PciHostBridgeLib.inf
   PciSegmentLib|MdePkg/Library/UefiPciSegmentLibPciRootBridgeIo/UefiPciSegmentLibPciRootBridgeIo.inf
   A210PeripheralLib|A210Pkg/Library/PeripheralLib/PeripheralLib.inf
+  Fusb302Lib|RiscVPlatformPkg/Library/Fusb302Lib/Fusb302Lib.inf
   A210UsbHostLib|A210Pkg/Library/UsbHostLib/UsbHostLib.inf
   Dwc2HostPlatformLib|A210Pkg/Library/UsbHostLib/Dwc2HostPlatformLib.inf
   DmaLib|EmbeddedPkg/Library/NonCoherentDmaLib/NonCoherentDmaLib.inf

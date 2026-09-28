@@ -7,13 +7,16 @@
   LIBRARY_CLASS = A210UsbHostLib
 [Sources]
   UsbHost.c
+  Typec.c
 [Packages]
   MdePkg/MdePkg.dec
   A210Pkg/A210Pkg.dec
+  RiscVPlatformPkg/RiscVPlatformPkg.dec
 [LibraryClasses]
   A210PeripheralLib
   BaseLib
   DebugLib
   FdtLib
+  Fusb302Lib
   IoLib
   TimerLib
