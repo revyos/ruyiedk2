@@ -8,8 +8,8 @@ contents unchanged.
 
 `MelonPiPkg` selects the board profile. `A210Pkg` contains the SoC MMIO
 resources and eMMC integration. `RiscVPlatformPkg` provides the shared
-FDT-based SEC entry and a serial boot manager. The upstream EDK2 tree
-remains unchanged.
+FDT-based SEC entry, boot manager and openRuyi startup graphics.
+The upstream EDK2 tree remains unchanged.
 
 The EDK2 FD is linked at `0x88000000`. SEC temporary memory occupies
 `0x84000000..0x85ffffff`, separately from coreboot, its FDT, and the

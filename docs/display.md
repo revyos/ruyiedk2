@@ -61,6 +61,22 @@ ExitBootServices stops polling, performs a final cache clean/invalidate,
 and leaves scanout and its reserved pages intact. The OS then owns
 modesetting, framebuffer mappings and cache management.
 
+## Linux display memory
+
+The Linux DC8200 driver uses a 32-bit DMA mask. Its framebuffers need
+physically contiguous memory below 4 GiB. Enable `CONFIG_DMA_CMA=y`
+(which selects `CONFIG_CMA`) when building the kernel; an existing
+`.config` is not updated merely by editing or rebasing defconfig.
+
+The A210 module DT defines a 256 MiB default CMA pool with allocation
+restricted to `0x80000000..0xffffffff`. The DT reservation alone cannot
+provide CMA allocations when kernel CMA support is disabled. A symptom
+is `fbdev: Failed to setup emulation (ret=-12)` despite free system RAM.
+Check `CmaTotal` in `/proc/meminfo` and the DRM framebuffer DMA address.
+
+This Linux pool is separate from the firmware GOP framebuffer. Basic
+HDMI console output uses DC8200 and does not require the PowerVR GPU.
+
 ## Build and checks
 
 Run from this repository:
