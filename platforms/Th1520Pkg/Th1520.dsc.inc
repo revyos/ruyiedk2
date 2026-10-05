@@ -37,6 +37,7 @@
   Th1520MacStoreLib|Th1520Pkg/Library/MacStoreLib/MacStoreLib.inf
   Th1520NvStoreLib|Th1520Pkg/Library/NvStoreLib/NvStoreLib.inf
   Th1520SpiLib|Th1520Pkg/Library/SpiLib/SpiLib.inf
+  Th1520ByteStorageLib|Th1520Pkg/Library/ByteStorageLib/ByteStorage.inf
   BootProgressLib|RiscVPlatformPkg/Library/BootProgressLib/BootProgressLib.inf
   BootLogoLib|MdeModulePkg/Library/BootLogoLib/BootLogoLib.inf
   FrameBufferBltLib|MdeModulePkg/Library/FrameBufferBltLib/FrameBufferBltLib.inf

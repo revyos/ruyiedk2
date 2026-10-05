@@ -211,6 +211,18 @@ edk2-recovery-check:
 		-o $(EDK2_BUILD)/test-recovery
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-recovery
 
+.PHONY: edk2-storage-bytes-check
+check: edk2-storage-bytes-check
+edk2-storage-bytes-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) -g -Wall -Wextra -fsanitize=address,undefined -fshort-wchar \
+		-I$(EDK2_SOURCE)/MdePkg/Include \
+		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
+		-Iplatforms/Th1520Pkg/Include tests/edk2-storage-bytes.c \
+		platforms/Th1520Pkg/Library/ByteStorageLib/ByteStorage.c \
+		-o $(EDK2_BUILD)/test-storage-bytes
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-storage-bytes
+
 .PHONY: edk2-io-test edk2-emmc-check
 edk2-io-test: basetools
 	tools/build.sh -D IO_TEST -m tests/IoTest/IoTest.inf

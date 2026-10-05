@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = Th1520ByteStorageLib
+  FILE_GUID = 63bd2097-cd3c-486c-8f8c-5df0261a8dcc
+  MODULE_TYPE = BASE
+  LIBRARY_CLASS = Th1520ByteStorageLib
+[Sources]
+  ByteStorage.c
+[Packages]
+  MdePkg/MdePkg.dec
+  Th1520Pkg/Th1520Pkg.dec
+[LibraryClasses]
+  BaseMemoryLib
+  MemoryAllocationLib

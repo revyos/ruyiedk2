@@ -13,6 +13,8 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Protocol/BlockIo.h>
 #include <Protocol/Th1520BootArea.h>
+#include <Protocol/Th1520EmmcAccess.h>
+#include <Library/Th1520ByteStorageLib.h>
 #include <Protocol/Th1520MacStore.h>
 #include <Library/Th1520MacStoreLib.h>
 #include <Library/MemoryAllocationLib.h>
@@ -688,6 +690,52 @@ STATIC TH1520_BOOT_PARTITIONS_PROTOCOL BootPartitions = {
 STATIC TH1520_BOOT_AREA_PROTOCOL BootArea = {0, BootAreaRead, BootAreaWrite};
 
 STATIC EFI_STATUS
+RawTransfer (UINT64 Offset, UINTN Length, VOID *Buffer, BOOLEAN Write)
+{
+  return Transfer (Media.MediaId, Offset / 512, Length, Buffer, Write);
+}
+
+STATIC EFI_STATUS
+RawAccess (TH1520_EMMC_ACCESS_PROTOCOL *This, UINTN Partition,
+           UINT64 Offset, UINTN Length, VOID *Buffer, BOOLEAN Write)
+{
+  EFI_STATUS Status, Restore;
+  UINT64 Capacity;
+  if (This == NULL || Partition > 2)
+    return EFI_INVALID_PARAMETER;
+  Capacity = Partition == 0 ? This->UserSize : This->BootSize;
+  if (Offset > Capacity || Length > Capacity - Offset ||
+      (Length && Buffer == NULL))
+    return EFI_INVALID_PARAMETER;
+  if (Length == 0)
+    return EFI_SUCCESS;
+  EfiAcquireLock (&ControllerLock);
+  Status = SelectPartition ((UINT8)Partition);
+  if (!EFI_ERROR (Status))
+    Status = Th1520StorageBytes (Capacity, 512, RawTransfer,
+                                Offset, Length, Buffer, Write);
+  Restore = SelectPartition (0);
+  EfiReleaseLock (&ControllerLock);
+  return EFI_ERROR (Status) ? Status : Restore;
+}
+
+STATIC EFI_STATUS EFIAPI
+RawRead (TH1520_EMMC_ACCESS_PROTOCOL *This, UINTN Partition,
+         UINT64 Offset, UINTN Length, VOID *Buffer)
+{
+  return RawAccess (This, Partition, Offset, Length, Buffer, FALSE);
+}
+
+STATIC EFI_STATUS EFIAPI
+RawWrite (TH1520_EMMC_ACCESS_PROTOCOL *This, UINTN Partition,
+          UINT64 Offset, UINTN Length, CONST VOID *Buffer)
+{
+  return RawAccess (This, Partition, Offset, Length, (VOID *)Buffer, TRUE);
+}
+
+STATIC TH1520_EMMC_ACCESS_PROTOCOL RawMedia = {0, 0, RawRead, RawWrite};
+
+STATIC EFI_STATUS
 MacBlockRead (UINTN Offset, VOID *Block)
 {
   if (Offset > TH1520_MAC_REGION_SIZE - 512)
@@ -770,6 +818,13 @@ EmmcInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
   }
   Status = gBS->InstallMultipleProtocolInterfaces (&Handle, &gEfiBlockIoProtocolGuid, &BlockIo,
                                                    &gEfiDevicePathProtocolGuid, &Path, NULL);
+  if (!EFI_ERROR (Status))
+  {
+    RawMedia.UserSize = (Media.LastBlock + 1) * 512;
+    RawMedia.BootSize = BootAreaSize;
+    Status = gBS->InstallProtocolInterface (&Handle, &gTh1520EmmcAccessProtocolGuid,
+                                            EFI_NATIVE_INTERFACE, &RawMedia);
+  }
   if (!EFI_ERROR (Status) && PcdGetBool (PcdFirmwareOnEmmc))
   {
     if (BootAreaSize < PcdGet32 (PcdFirmwareImageLimit))

@@ -15,6 +15,7 @@
   Th1520Pkg/Th1520Pkg.dec
   MdePkg/MdePkg.dec
 [LibraryClasses]
+  Th1520ByteStorageLib
   Th1520MacStoreLib
   CacheMaintenanceLib
   PcdLib
@@ -28,6 +29,7 @@
   UefiBootServicesTableLib
   UefiDriverEntryPoint
 [Protocols]
+  gTh1520EmmcAccessProtocolGuid
   gTh1520MacStoreProtocolGuid
   gFdtClientProtocolGuid
   gTh1520BootAreaProtocolGuid
