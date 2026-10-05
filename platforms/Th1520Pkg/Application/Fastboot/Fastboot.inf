@@ -8,8 +8,6 @@
   ENTRY_POINT = FastbootMain
 [Sources]
   Fastboot.c
-  Image.c
-  Image.h
   Targets.c
   Targets.h
   Usb.c
@@ -17,17 +15,15 @@
 [Packages]
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
-  CryptoPkg/CryptoPkg.dec
   Th1520Pkg/Th1520Pkg.dec
 [LibraryClasses]
+  Th1520ByteStorageLib
   Th1520SpiLib
   PcdLib
   Th1520BoardLib
   BaseLib
   BaseMemoryLib
-  BaseCryptLib
   CacheMaintenanceLib
-  FdtLib
   IoLib
   MemoryAllocationLib
   PrintLib
@@ -38,15 +34,9 @@
   UefiLib
 
 [Protocols]
-  gTh1520BootAreaProtocolGuid
-  gTh1520BootPartitionsProtocolGuid
+  gTh1520EmmcAccessProtocolGuid
   gTh1520UsbRoleProtocolGuid
 [Pcd]
-  gTh1520TokenSpaceGuid.PcdRecoveryMode
-  gTh1520TokenSpaceGuid.PcdFirmwareOnEmmc
-  gTh1520TokenSpaceGuid.PcdFirmwareImageLimit
-  gTh1520TokenSpaceGuid.PcdFitConfiguration
-  gTh1520TokenSpaceGuid.PcdBoardCompatible
   gTh1520TokenSpaceGuid.PcdFirmwareName
   gTh1520TokenSpaceGuid.PcdBoardManufacturer
   gTh1520TokenSpaceGuid.PcdFastbootProduct

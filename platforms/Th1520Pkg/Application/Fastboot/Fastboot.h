@@ -2,7 +2,6 @@
 #pragma once
 #include <Uefi.h>
 #include <Library/PcdLib.h>
-#include "Image.h"
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/CacheMaintenanceLib.h>
@@ -18,4 +17,5 @@ UsbReceive (VOID *Buffer, UINTN *Length);
 EFI_STATUS
 UsbSend (CONST VOID *Buffer, UINTN Length);
 EFI_STATUS
-SpiFlash (CONST VOID *Buffer, UINTN Length);
+SpiFlash (UINT64 Offset, CONST VOID *Buffer, UINTN Length);
+EFI_STATUS SpiRead (UINT64 Offset, VOID *Buffer, UINTN Length);

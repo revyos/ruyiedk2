@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "Fastboot.h"
 #include "Targets.h"
-#include <Protocol/Th1520BootArea.h>
+#include <Protocol/Th1520EmmcAccess.h>
 #include <Library/PrintLib.h>
 #include <Library/UefiApplicationEntryPoint.h>
 #include <Library/UefiLib.h>
@@ -14,6 +14,29 @@ Reply (CONST CHAR8 *Prefix, CONST CHAR8 *Message)
   AsciiSPrint (Response, sizeof (Response), "%a%a", Prefix, Message);
   return UsbSend (Response, AsciiStrLen (Response));
 }
+
+STATIC UINT64
+Capacity (TH1520_FLASH_TARGET Target, TH1520_EMMC_ACCESS_PROTOCOL *Emmc)
+{
+  return Th1520TargetCapacity (Target, Emmc ? Emmc->UserSize : 0,
+                              Emmc ? Emmc->BootSize : 0);
+}
+
+STATIC EFI_STATUS
+StorageIo (TH1520_STORAGE_RANGE *Range, TH1520_EMMC_ACCESS_PROTOCOL *Emmc,
+           UINTN Length, VOID *Buffer, BOOLEAN Write)
+{
+  UINTN Partition;
+  if (Range->Target == Th1520TargetSpi)
+    return Write ? SpiFlash (Range->Offset, Buffer, Length) :
+                   SpiRead (Range->Offset, Buffer, Length);
+  if (Emmc == NULL) return EFI_NOT_FOUND;
+  Partition = Range->Target == Th1520TargetEmmcBoot0 ? 1 :
+              Range->Target == Th1520TargetEmmcBoot1 ? 2 : 0;
+  return Write ? Emmc->Write (Emmc, Partition, Range->Offset, Length, Buffer) :
+                 Emmc->Read (Emmc, Partition, Range->Offset, Length, Buffer);
+}
+
 EFI_STATUS EFIAPI
 FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
@@ -22,20 +45,9 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
   UINT8 *Download, *Packet;
   UINTN Expected = 0, Done = 0, Size, I;
   BOOLEAN Complete = FALSE, Exit = FALSE;
-  CHAR8 Command[65], Response[16];
-  TH1520_BOOT_AREA_PROTOCOL *BootArea = NULL;
-  TH1520_BOOT_PARTITIONS_PROTOCOL *Partitions = NULL;
-  TH1520_IMAGE_POLICY Policy = {
-      (CONST CHAR8 *)PcdGetPtr (PcdFitConfiguration), (CONST CHAR8 *)PcdGetPtr (PcdBoardCompatible),
-      PcdGetBool (PcdFirmwareOnEmmc) ? "emmc-boot0" : "spi-nor", PcdGet32 (PcdFirmwareImageLimit)};
-  if (PcdGetBool (PcdFirmwareOnEmmc))
-  {
-    gBS->LocateProtocol (&gTh1520BootAreaProtocolGuid, NULL, (VOID **)&BootArea);
-  }
-  if (PcdGetBool (PcdRecoveryMode))
-  {
-    gBS->LocateProtocol (&gTh1520BootPartitionsProtocolGuid, NULL, (VOID **)&Partitions);
-  }
+  CHAR8 Command[65], Response[32];
+  TH1520_EMMC_ACCESS_PROTOCOL *Emmc = NULL;
+  gBS->LocateProtocol (&gTh1520EmmcAccessProtocolGuid, NULL, (VOID **)&Emmc);
   Status = gBS->SetWatchdogTimer (0, 0, 0, NULL);
   if (EFI_ERROR (Status))
   {
@@ -55,10 +67,7 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     goto Out;
   }
   Print (L"USB fastboot: %a. ESC returns to the boot manager.\r\n", PcdGetPtr (PcdFirmwareName));
-  if (PcdGetBool (PcdRecoveryMode))
-  {
-    Print (L"Raw recovery targets: spi, emmcboot0, emmcboot1\r\n");
-  }
+  Print (L"Storage targets: spi, emmc0, emmc0boot0, emmc0boot1\r\n");
   while (!Exit)
   {
     if (!EFI_ERROR (gST->ConIn->ReadKeyStroke (gST->ConIn, &Key)) && Key.ScanCode == SCAN_ESC)
@@ -149,177 +158,113 @@ FastbootMain (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     else if (!AsciiStrnCmp (Command, "getvar:", 7))
     {
       CONST CHAR8 *Name = Command + 7, *Value = NULL;
-      TH1520_FLASH_TARGET Target = Th1520TargetNone;
-      if (PcdGetBool (PcdRecoveryMode) && !AsciiStrnCmp (Name, "partition-size:", 15))
+      TH1520_STORAGE_RANGE Range;
+      UINT64 Bytes;
+      if (!AsciiStrnCmp (Name, "partition-size:", 15) &&
+          Th1520ParseStorageRange (Name + 15, &Range))
       {
-        Target = Th1520RecoveryTarget (Name + 15);
-      }
-      if (Target != Th1520TargetNone)
-      {
-        UINTN Limit = Th1520TargetMaximum (Target, Partitions ? Partitions->Size : 0);
-        if (Limit)
+        Bytes = Capacity (Range.Target, Emmc);
+        if (Bytes && Range.Offset <= Bytes &&
+            (!Range.HasLength || Range.Length <= Bytes - Range.Offset))
         {
-          AsciiSPrint (Response, sizeof (Response), "0x%08x", (UINT32)Limit);
+          Bytes = Range.HasLength ? Range.Length : Bytes - Range.Offset;
+          AsciiSPrint (Response, sizeof (Response), "0x%016Lx", Bytes);
           Value = Response;
         }
       }
-      else if (PcdGetBool (PcdRecoveryMode) && !AsciiStrnCmp (Name, "partition-type:", 15) &&
-               Th1520RecoveryTarget (Name + 15) != Th1520TargetNone)
-      {
+      else if (!AsciiStrnCmp (Name, "partition-type:", 15) &&
+               Th1520ParseStorageRange (Name + 15, &Range))
         Value = "raw";
-      }
-      else if (PcdGetBool (PcdRecoveryMode) && !AsciiStrnCmp (Name, "has-slot:", 9) &&
-               Th1520RecoveryTarget (Name + 9) != Th1520TargetNone)
-      {
+      else if (!AsciiStrnCmp (Name, "has-slot:", 9) &&
+               Th1520ParseStorageRange (Name + 9, &Range))
         Value = "no";
-      }
-      else if (!AsciiStrCmp (Name, "version"))
-      {
-        Value = "0.4";
-      }
-      else if (!AsciiStrCmp (Name, "product"))
-      {
+      else if (!AsciiStrCmp (Name, "version")) Value = "0.4";
+      else if (!AsciiStrCmp (Name, "product") || !AsciiStrCmp (Name, "serialno"))
         Value = (CONST CHAR8 *)PcdGetPtr (PcdFastbootProduct);
-      }
-      else if (!AsciiStrCmp (Name, "serialno"))
-      {
-        Value = (CONST CHAR8 *)PcdGetPtr (PcdFastbootProduct);
-      }
-      else if (!AsciiStrCmp (Name, "max-download-size"))
-      {
-        Value = "0x02000000";
-      }
-      else if (!AsciiStrCmp (Name, "partition-size:loader"))
-      {
-        AsciiSPrint (Response, sizeof (Response), "0x%08x", PcdGet32 (PcdFirmwareImageLimit));
-        Value = Response;
-      }
-      else if (!AsciiStrCmp (Name, "max-fetch-size") && BootArea != NULL)
-      {
-        Value = "0x00400000";
-      }
-      else if (!AsciiStrCmp (Name, "partition-type:loader"))
-      {
-        Value = "raw";
-      }
-      else if (!AsciiStrCmp (Name, "is-userspace") || !AsciiStrCmp (Name, "has-slot:loader"))
-      {
-        Value = "no";
-      }
+      else if (!AsciiStrCmp (Name, "max-download-size") ||
+               !AsciiStrCmp (Name, "max-fetch-size")) Value = "0x02000000";
+      else if (!AsciiStrCmp (Name, "is-userspace")) Value = "no";
       else if (!AsciiStrCmp (Name, "all"))
       {
+        STATIC CONST CHAR8 *Names[] = {"spi", "emmc0", "emmc0boot0", "emmc0boot1"};
         CHAR8 Info[61];
         AsciiSPrint (Info, sizeof (Info), "product: %a", PcdGetPtr (PcdFastbootProduct));
         Status = Reply ("INFO", Info);
-        if (EFI_ERROR (Status))
+        for (I = 0; !EFI_ERROR (Status) && I < ARRAY_SIZE (Names); I++)
         {
-          break;
+          Th1520ParseStorageRange (Names[I], &Range);
+          AsciiSPrint (Info, sizeof (Info), "partition-size:%a: 0x%016Lx",
+                       Names[I], Capacity (Range.Target, Emmc));
+          Status = Reply ("INFO", Info);
         }
-        Status = Reply ("INFO", "max-download-size: 0x02000000");
-        if (EFI_ERROR (Status))
-        {
-          break;
-        }
-        AsciiSPrint (Info, sizeof (Info), "partition-size:loader: 0x%08x",
-                     PcdGet32 (PcdFirmwareImageLimit));
-        Status = Reply ("INFO", Info);
-        if (EFI_ERROR (Status))
-        {
-          break;
-        }
+        if (EFI_ERROR (Status)) break;
         Value = "";
       }
       Status = Reply (Value ? "OKAY" : "FAIL", Value ? Value : "unknown variable");
     }
-    else if (!AsciiStrnCmp (Command, "fetch:loader", 12))
+    else if (!AsciiStrnCmp (Command, "fetch:", 6))
     {
-      UINTN Offset = 0, Length = BootArea == NULL ? 0 : (UINTN)BootArea->Size, Sent;
-      CHAR8 *End;
-      BOOLEAN Valid = Command[12] == 0;
-      if (Command[12] == ':')
-      {
-        Status = AsciiStrHexToUintnS (Command + 13, &End, &Offset);
-        if (!EFI_ERROR (Status) && *End == ':')
-        {
-          Status = AsciiStrHexToUintnS (End + 1, &End, &Length);
-          Valid = !EFI_ERROR (Status) && *End == 0;
-        }
-      }
+      TH1520_STORAGE_RANGE Range;
+      UINT64 Limit, Length;
+      UINTN Sent;
       Complete = FALSE;
-      if (!Valid || BootArea == NULL || Length == 0 || Length > DOWNLOAD_MAX ||
-          Offset > BootArea->Size || Length > BootArea->Size - Offset)
+      if (!Th1520ParseStorageRange (Command + 6, &Range))
       {
-        Status = Reply ("FAIL", "invalid boot0 read range");
+        Status = Reply ("FAIL", "unknown medium or invalid range");
         continue;
       }
-      Status = BootArea->Read (BootArea, Offset, Length, Download);
+      Limit = Capacity (Range.Target, Emmc);
+      Length = Range.HasLength ? Range.Length :
+               (Range.Offset <= Limit ? Limit - Range.Offset : 0);
+      if (!Limit || !Length || Length > DOWNLOAD_MAX ||
+          Range.Offset > Limit || Length > Limit - Range.Offset)
+      {
+        Status = Reply ("FAIL", "invalid read range");
+        continue;
+      }
+      Status = StorageIo (&Range, Emmc, (UINTN)Length, Download, FALSE);
       if (EFI_ERROR (Status))
       {
-        Status = Reply ("FAIL", "boot0 read failed");
+        Status = Reply ("FAIL", "storage read failed");
         continue;
       }
       AsciiSPrint (Response, sizeof (Response), "DATA%08x", (UINT32)Length);
       Status = UsbSend (Response, 12);
       for (Sent = 0; !EFI_ERROR (Status) && Sent < Length; Sent += Size)
       {
-        Size = MIN (16384, Length - Sent);
+        Size = MIN (16384, (UINTN)Length - Sent);
         Status = UsbSend (Download + Sent, Size);
       }
-      if (!EFI_ERROR (Status))
-      {
-        Status = Reply ("OKAY", "");
-      }
+      if (!EFI_ERROR (Status)) Status = Reply ("OKAY", "");
     }
-    else if (PcdGetBool (PcdRecoveryMode) && !AsciiStrnCmp (Command, "flash:", 6) &&
-             Th1520RecoveryTarget (Command + 6) != Th1520TargetNone)
+    else if (!AsciiStrnCmp (Command, "flash:", 6))
     {
-      TH1520_FLASH_TARGET Target = Th1520RecoveryTarget (Command + 6);
-      UINTN Limit = Th1520TargetMaximum (Target, Partitions ? Partitions->Size : 0);
-      if (!Complete || !Th1520ValidRawImage (Download, Done, Limit))
+      TH1520_STORAGE_RANGE Range;
+      UINT64 Limit;
+      if (!Th1520ParseStorageRange (Command + 6, &Range))
       {
-        Status = Reply ("FAIL", "invalid raw image, size or unavailable target");
+        Complete = FALSE;
+        Status = Reply ("FAIL", "unknown medium or invalid range");
+        continue;
       }
-      else
+      Limit = Capacity (Range.Target, Emmc);
+      if (!Complete || !Done || Range.Offset > Limit || Done > Limit - Range.Offset ||
+          (Range.HasLength && Range.Length != Done))
       {
-        Status = Target == Th1520TargetSpi ? SpiFlash (Download, Done) :
-            Partitions->Write (Partitions,
-                Target == Th1520TargetEmmcBoot0 ? 1 : 2, Download, Done);
-        if (EFI_ERROR (Status))
-        {
-          CHAR8 Error[61];
-          AsciiSPrint (Error, sizeof (Error), "%a: %r", Command + 6, Status);
-          Status = Reply ("FAIL", Error);
-        }
-        else
-        {
-          Status = Reply ("OKAY", "");
-        }
+        Complete = FALSE;
+        Status = Reply ("FAIL", "invalid write range or no download");
+        continue;
       }
-    }
-    else if (!AsciiStrCmp (Command, "flash:loader"))
-    {
-      if (!Complete || !Th1520ValidImage (Download, Done, &Policy))
+      // Every payload is written verbatim, including sparse-container bytes.
+      Complete = FALSE;
+      Status = StorageIo (&Range, Emmc, Done, Download, TRUE);
+      if (EFI_ERROR (Status))
       {
-        Status = Reply ("FAIL", "invalid image for this board or storage");
+        CHAR8 Error[61];
+        AsciiSPrint (Error, sizeof (Error), "storage write: %r", Status);
+        Status = Reply ("FAIL", Error);
       }
-      else
-      {
-        Status =
-            PcdGetBool (PcdFirmwareOnEmmc)
-                ? (BootArea == NULL ? EFI_NOT_READY : BootArea->Write (BootArea, Download, Done))
-                : SpiFlash (Download, Done);
-        if (EFI_ERROR (Status))
-        {
-          CHAR8 Error[61];
-          AsciiSPrint (Error, sizeof (Error), "%a: %r",
-                       PcdGetBool (PcdFirmwareOnEmmc) ? "eMMC boot0" : "SPI", Status);
-          Status = Reply ("FAIL", Error);
-        }
-        else
-        {
-          Status = Reply ("OKAY", "");
-        }
-      }
+      else Status = Reply ("OKAY", "");
     }
     else if (!AsciiStrCmp (Command, "continue"))
     {

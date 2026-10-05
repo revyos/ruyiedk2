@@ -19,46 +19,13 @@ DTB. The resulting RAM images are separate and must not be exchanged
 between boards. Neither a U-Boot runtime nor its Fastboot implementation
 is part of this recovery path.
 
-## Fastboot targets
+## Fastboot media access
 
-Only the recovery profile exposes these raw targets:
-
-| Target | Device range | Size |
-| --- | --- | --- |
-| `spi` | SPI NOR, starting at offset zero | 8 MiB |
-| `emmcboot0` | eMMC hardware boot partition 1 | Reported by eMMC |
-| `emmcboot1` | eMMC hardware boot partition 2 | Reported by eMMC |
-
-For the tested Meles eMMC, each boot partition is 4 MiB. Query capacity
-before selecting an image:
-
-```sh
-fastboot getvar product
-fastboot getvar partition-size:spi
-fastboot getvar partition-size:emmcboot0
-fastboot getvar partition-size:emmcboot1
-```
-
-Once recovery is running, write a complete image for the selected
-medium, for example:
-
-```sh
-fastboot -S 0 flash spi meles-spi.bin
-# Or select one eMMC boot partition:
-fastboot -S 0 flash emmcboot0 meles-emmc.bin
-fastboot -S 0 flash emmcboot1 meles-emmc.bin
-```
-
-Raw recovery images are bounded by the target capacity and must not be
-Android sparse containers. They do not require the normal SPL/FIT
-`loader` format. Writes are read back and compared by the existing
-writers. eMMC operations restore access to the user area and preserve
-boot-enable/boot-ack configuration; writing boot1 does not select it as
-the active BootROM boot partition. There is no raw user-area target.
-
-SPI erases whole 4 KiB sectors covering the image. eMMC pads its final
-512-byte block with `0xff`. Bytes beyond that erase/write span remain
-unchanged. The existing `flash:loader` validation is also retained.
+RAM recovery and normal EDK2 both expose `spi`, `emmc0`, `emmc0boot0`
+and `emmc0boot1` for reading and writing. Commands address the medium
+by name and write opaque bytes without image-format validation.
+See [Fastboot media access](fastboot-storage.md) for capacities, reads,
+offsets, physical-block handling and the host helper.
 
 ## Validation
 
@@ -71,13 +38,14 @@ observed without a hart-0 policy.
 LPi4A 8 GiB hardware also completed BootROM RAM download, DDR training,
 address-map adjustment, AON voltage verification, OpenSBI and EDK2
 Fastboot. It enumerated as `lpi4a-recovery`. Read-only capacity queries
-for `emmcboot0`, `emmcboot1` and `spi` succeeded. Use the coreboot
+for the earlier `emmcboot0`, `emmcboot1` and `spi` names succeeded. Use the coreboot
 normal eMMC profile to build the LPi4A boot0 image. Meles normal
 firmware uses the coreboot SPI profile. Both paths hand off through
 OpenSBI to the corresponding normal EDK2 volume.
 
 The Meles recovery service reported 8 MiB SPI and 4 MiB per eMMC boot area.
-It rejected a sparse input before writing. A 1 MiB image was written to
+The earlier recovery version rejected sparse inputs; the current raw
+interface writes those bytes verbatim. A 1 MiB image was written to
 SPI, boot0 and boot1, with each writer's readback comparison passing.
 The eMMC user area was not written and boot selection was preserved.
 
@@ -93,5 +61,7 @@ Capsule architectural protocol, and disable the optional driver-health
 form check when no forms browser is included. The RELEASE SPI payload
 also completed hardware startup.
 
-Host tests cover target names, bounds, unavailable eMMC and sparse
-rejection. Both normal board profiles and the recovery profile build.
+Current host tests cover media names, 64-bit byte ranges, partial-block
+preservation, opaque contents and I/O failures. The earlier board receipts
+above describe the preceding recovery interface; they do not validate
+the current interface. Record new build and board results separately.

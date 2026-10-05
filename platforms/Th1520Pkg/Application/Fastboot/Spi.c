@@ -1,35 +1,53 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 #include "Fastboot.h"
 #include <Library/Th1520SpiLib.h>
+#include <Library/Th1520ByteStorageLib.h>
 #include <Library/PrintLib.h>
 
-EFI_STATUS
-SpiFlash (CONST VOID *Buffer, UINTN Length)
+STATIC EFI_STATUS
+Transfer (UINT64 Offset, UINTN Length, VOID *Buffer, BOOLEAN Write)
 {
   EFI_STATUS Status;
-  EFI_TPL Previous;
   CHAR8 Progress[64];
-  if (!Buffer || !Length || Length > SIZE_8MB - SIZE_256KB)
-    return EFI_BAD_BUFFER_SIZE;
-  // Serialize access with variable writes and other DXE callbacks.
-  Previous = gBS->RaiseTPL (TPL_NOTIFY);
-  Status = Th1520SpiInit ();
-  for (UINTN Offset = 0; !EFI_ERROR (Status) && Offset < Length;
-       Offset += SIZE_4KB)
+  if (!Write) return Th1520SpiRead ((UINTN)Offset, Length, Buffer);
+  if (!(Offset & 0xffff))
   {
-    if (!(Offset & 0xffff))
-    {
-      AsciiSPrint (Progress, sizeof (Progress),
-                   "INFOWriting SPI 0x%08x", (UINT32)Offset);
-      Status = UsbSend (Progress, AsciiStrLen (Progress));
-      if (EFI_ERROR (Status))
-        break;
-    }
-    Status = Th1520SpiErase (Offset, SIZE_4KB);
-    if (!EFI_ERROR (Status))
-      Status = Th1520SpiProgram (Offset, MIN (SIZE_4KB, Length - Offset),
-                                 (CONST UINT8 *)Buffer + Offset);
+    AsciiSPrint (Progress, sizeof (Progress), "INFOWriting SPI 0x%08x", (UINT32)Offset);
+    Status = UsbSend (Progress, AsciiStrLen (Progress));
+    if (EFI_ERROR (Status)) return Status;
   }
+  for (UINTN Done = 0; Done < Length; Done += SIZE_4KB)
+  {
+    Status = Th1520SpiErase ((UINTN)Offset + Done, SIZE_4KB);
+    if (!EFI_ERROR (Status))
+      Status = Th1520SpiProgram ((UINTN)Offset + Done, SIZE_4KB,
+                                (CONST UINT8 *)Buffer + Done);
+    if (EFI_ERROR (Status)) return Status;
+  }
+  return EFI_SUCCESS;
+}
+
+STATIC EFI_STATUS
+Access (UINT64 Offset, UINTN Length, VOID *Buffer, BOOLEAN Write)
+{
+  EFI_STATUS Status;
+  EFI_TPL Previous = gBS->RaiseTPL (TPL_NOTIFY);
+  Status = Th1520SpiInit ();
+  if (!EFI_ERROR (Status))
+    Status = Th1520StorageBytes (SIZE_8MB, SIZE_4KB, Transfer,
+                                Offset, Length, Buffer, Write);
   gBS->RestoreTPL (Previous);
   return Status;
+}
+
+EFI_STATUS
+SpiFlash (UINT64 Offset, CONST VOID *Buffer, UINTN Length)
+{
+  return Access (Offset, Length, (VOID *)Buffer, TRUE);
+}
+
+EFI_STATUS
+SpiRead (UINT64 Offset, VOID *Buffer, UINTN Length)
+{
+  return Access (Offset, Length, Buffer, FALSE);
 }

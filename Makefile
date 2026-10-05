@@ -65,7 +65,7 @@ check: edk2-display-check edk2-usb-check edk2-reset-check
 check: edk2-gmac-address-check
 check-artifacts: edk2-meles-usb-check edk2-lpi4a-usb-check
 check: edk2-recovery-check
-check-artifacts: edk2-check edk2-gmac-check
+check-artifacts: edk2-gmac-check
 	python3 tests/edk2-usb-dt.py $(IMAGE_BUILD)/$(EDK2_BOARD).dtb \
 		$(IMAGE_BUILD)/uboot/$(EDK2_IMAGE)
 
@@ -174,20 +174,6 @@ edk2-lpi4a-usb-check:
 		-lfdt -o $(EDK2_BUILD)/test-lpi4a-usb-power
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-lpi4a-usb-power \
 		$(FIRMWARE_BUILD)/edk2-lpi4a/lpi4a.dtb
-
-.PHONY: edk2-check
-edk2-check:
-	mkdir -p $(EDK2_BUILD)
-	$(CC) -g -fsanitize=address,undefined -fshort-wchar \
-		-I$(EDK2_SOURCE)/MdePkg/Include \
-		-I$(EDK2_SOURCE)/MdePkg/Include/X64 \
-		-I$(EDK2_SOURCE)/CryptoPkg/Include \
-		tests/edk2-image.c \
-		platforms/Th1520Pkg/Application/Fastboot/Image.c \
-		-lfdt -lcrypto -o $(EDK2_BUILD)/test-image
-	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-image \
-		$(IMAGE_BUILD)/uboot/$(EDK2_IMAGE) $(EDK2_BOARD) \
-		$(EDK2_BOOT)
 
 .PHONY: edk2-gmac-check
 edk2-gmac-check:

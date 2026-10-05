@@ -87,6 +87,7 @@ external firmware. For EFI I/O benchmarks, see
 - [Device tree](docs/device-tree.md): resource parsing and board wiring.
 - [Display](docs/display.md): HDMI modes, clocks and OS handoff.
 - [Recovery](docs/recovery.md): RAM profile and Fastboot targets.
+- [Fastboot media access](docs/fastboot-storage.md): raw SPI and eMMC reads/writes in both profiles.
 - [Variables](docs/variables.md): persistent variables and BIOS MAC setup.
 - [IPv4 configuration](docs/network-configuration.md): form save behavior.
 

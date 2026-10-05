@@ -23,9 +23,10 @@ copy so interrupted or invalid writes leave the previous copy usable.
 The original random address is retained; unchanged settings are not
 written again.
 
-Fastboot `spi`, `emmcboot0` and normal firmware updates exclude these
-reserved regions. boot1 is not used for variable storage. External
-programmers and older whole-device erase tools may overwrite them.
+Raw Fastboot media access includes these regions in the physical capacity.
+Writes affect exactly the requested byte span. A normal 2 MiB SPI image
+does not reach the variable banks. Boot1 is not used for variable storage.
+See [Fastboot media access](fastboot-storage.md) for names and byte ranges.
 
 ## MAC selection
 
