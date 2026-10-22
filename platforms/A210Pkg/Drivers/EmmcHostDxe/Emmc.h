@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: BSD-2-Clause-Patent
 #pragma once
 
-#define PERI3_CLOCK_ENABLE (A210_PERI3_BASE + 0x200)
-#define PERI3_RESET_N (A210_PERI3_BASE + 0x400)
-#define PERI3_EMMC_CLOCKS (BIT2 | (0x1f << 8))
-#define PERI3_EMMC_RESETS (7 << 3)
-
 #define PHY_CONFIG 0x300
 #define PHY_CMD_PAD 0x304
 #define PHY_DATA_PAD 0x306

@@ -2,7 +2,8 @@
 #include <Uefi.h>
 #include <A210.h>
 #include <Library/BaseLib.h>
-#include <Library/A210ClockLib.h>
+#include <Library/A210PeripheralLib.h>
+#include <Library/A210ScmiLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
 #include <Library/IoLib.h>
@@ -169,6 +170,8 @@ EFI_STATUS EFIAPI
 EmmcHostInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
 {
   FDT_CLIENT_PROTOCOL *Fdt;
+  CONST VOID *Tree = A210GetFdt ();
+  UINT64 Rate;
   EFI_STATUS Status;
   CONST VOID *Data;
   UINT32 Size;
@@ -224,13 +227,20 @@ EmmcHostInitialize (EFI_HANDLE Image, EFI_SYSTEM_TABLE *SystemTable)
     return EFI_UNSUPPORTED;
   }
   mMaxFrequency = MIN (mMaxFrequency, 52000000);
-  mClockHz = A210EmmcClock ();
-  if (mClockHz == 0)
-  {
-    return EFI_DEVICE_ERROR;
-  }
-  MmioOr32 (PERI3_CLOCK_ENABLE, PERI3_EMMC_CLOCKS);
-  MmioOr32 (PERI3_RESET_N, PERI3_EMMC_RESETS);
+  if (!Tree)
+    return EFI_NOT_FOUND;
+  Status = A210ScmiPowerOn (Tree, Node);
+  if (EFI_ERROR (Status))
+    return Status;
+  Status = A210ScmiClocksEnable (Tree, Node);
+  if (EFI_ERROR (Status))
+    return Status;
+  Status = A210ScmiClockGet (Tree, Node, "core", &Rate);
+  if (EFI_ERROR (Status))
+    return Status;
+  if (!Rate || Rate > MAX_UINT32)
+    return EFI_UNSUPPORTED;
+  mClockHz = (UINT32)Rate;
   Status = gBS->InstallProtocolInterface (
       &OverrideHandle, &gEdkiiSdMmcOverrideProtocolGuid,
       EFI_NATIVE_INTERFACE, &mOverride);
