@@ -3,6 +3,7 @@
 #include <Uefi.h>
 #include <A210.h>
 #include <Library/A210PeripheralLib.h>
+#include <Library/A210ScmiLib.h>
 #include <Library/A210UsbHostLib.h>
 #include <Library/BaseLib.h>
 #include <Library/DebugLib.h>
@@ -11,31 +12,6 @@
 #include <Library/TimerLib.h>
 #include "Typec.h"
 
-#define USB_CLOCK_COMMON (A210_USB_CPR_BASE + 0x00)
-#define USB_RESET_COMMON (A210_USB_CPR_BASE + 0x100)
-#define USB_BUS_GATES (BIT0 | BIT4 | BIT8 | BIT12 | BIT16)
-#define USB_BUS_RESETS (BIT0 | BIT4 | BIT8 | BIT12)
-#define USB31_CLOCK (A210_USB_CPR_BASE + 0x08)
-#define USB31_RESET (A210_USB_CPR_BASE + 0x108)
-#define USB31_GATES (BIT0 | BIT4 | BIT8 | BIT16 | BIT20)
-#define USB31_APB_RESET BIT0
-#define USB31_CORE_RESET BIT4
-#define USB31_PHY_RESET BIT8
-#define USB31_AFENCE_RESET BIT12
-#define USB_C10_CLOCK (A210_USB_CPR_BASE + 0x0c)
-#define USB_C10_RESET (A210_USB_CPR_BASE + 0x10c)
-#define C10_PHY_RESET BIT0
-#define C10_APB_RESET BIT4
-#define USB20_CLOCK (A210_USB_CPR_BASE + 0x10)
-#define USB20_WRAP_CLOCK (A210_USB_CPR_BASE + 0x14)
-#define USB20_RESET (A210_USB_CPR_BASE + 0x110)
-#define USB20_WRAP_RESET (A210_USB_CPR_BASE + 0x114)
-#define USB20_PHY_RESET (A210_USB_CPR_BASE + 0x118)
-#define USB20_GATES (BIT0 | BIT4 | BIT8 | BIT16 | BIT20 | BIT24 | BIT28)
-#define USB20_WRAP1_GATES (BIT4 | BIT24 | BIT28)
-#define USB20_WRAP1_RESETS (BIT8 | BIT12 | BIT24 | BIT28)
-#define USB20_WRAP1_CORE_RESET BIT12
-#define USB20_PHY1_RESET BIT4
 #define PHY_ANALOG 0x00
 #define PHY_CONFIG 0x04
 #define PHY_TX_LEVEL_MASK (15U << 17)
@@ -103,7 +79,8 @@ A210UsbHostStop (VOID)
 
 STATIC EFI_STATUS
 PhyRegisters (CONST VOID *Fdt, INT32 Node, UINTN Index,
-              CONST CHAR8 *Compatible, BOOLEAN Switched, UINTN *Base)
+              CONST CHAR8 *Compatible, BOOLEAN Switched, UINTN *Base,
+              INT32 *PhyNode)
 {
   CONST UINT32 *Phys;
   UINTN Size;
@@ -118,6 +95,7 @@ PhyRegisters (CONST VOID *Fdt, INT32 Node, UINTN Index,
   // A fixed host uses the normal routing; a TCPC must own DRD switching.
   if (!Switched && FdtGetProp (Fdt, Phy, "orientation-switch", NULL))
     return EFI_UNSUPPORTED;
+  *PhyNode = Phy;
   return A210Reg (Fdt, Phy, 0, Base, &Size);
 }
 
@@ -125,7 +103,7 @@ EFI_STATUS
 A210UsbHostInit (BOOLEAN Usb3, UINTN *Base)
 {
   VOID *Fdt = A210GetFdt ();
-  INT32 Node = -1;
+  INT32 Node = -1, Usb2Phy, Usb3Phy;
   UINTN Size, Phy, Tca;
   EFI_STATUS Status;
   BOOLEAN Typec;
@@ -148,7 +126,7 @@ A210UsbHostInit (BOOLEAN Usb3, UINTN *Base)
     return EFI_UNSUPPORTED;
   Status = PhyRegisters (Fdt, Node, 0,
       Usb3 ? "zhihe,a210-usb31-usb2-phy" : "zhihe,a210-usb2-phy1",
-      FALSE, &Phy);
+      FALSE, &Phy, &Usb2Phy);
   if (EFI_ERROR (Status))
     return Status;
   if (Phy != (Usb3 ? (A210_USB31_SYSREG_BASE + 0x80)
@@ -157,7 +135,7 @@ A210UsbHostInit (BOOLEAN Usb3, UINTN *Base)
   if (Usb3)
   {
     Status = PhyRegisters (Fdt, Node, 1, "zhihe,a210-c10-phy",
-                           Typec, &Tca);
+                           Typec, &Tca, &Usb3Phy);
     if (EFI_ERROR (Status) || Tca != A210_USB_C10_BASE)
       return EFI_UNSUPPORTED;
     mTca = Tca;
@@ -177,36 +155,49 @@ A210UsbHostInit (BOOLEAN Usb3, UINTN *Base)
   // Explicit fixed-host DTs may provide VBUS through a GPIO hog.
   if (EFI_ERROR (Status) && Status != EFI_NOT_FOUND)
     return Status;
-  MmioOr32 (USB_CLOCK_COMMON, USB_BUS_GATES);
-  MmioOr32 (USB_RESET_COMMON, USB_BUS_RESETS);
+  Status = A210ScmiPowerOn (Fdt, Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Fdt, Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Fdt, Usb2Phy);
+  if (EFI_ERROR (Status))
+    return Status;
   if (!Usb3)
   {
-    MmioOr32 (USB20_CLOCK, USB20_GATES);
-    MmioOr32 (USB20_WRAP_CLOCK, USB20_WRAP1_GATES);
-    MmioOr32 (USB20_RESET, USB20_GATES);
-    // Linux releases the wrapper before initializing the PHY.
-    MmioOr32 (USB20_WRAP_RESET, USB20_WRAP1_RESETS);
-    MmioAnd32 (USB20_WRAP_RESET, ~USB20_WRAP1_CORE_RESET);
+    Status = A210ScmiReset (Fdt, Node, "dwc2", FALSE);
+    if (!EFI_ERROR (Status))
+      Status = A210ScmiReset (Fdt, Node, "dwc2", TRUE);
+    if (EFI_ERROR (Status))
+      return Status;
     MicroSecondDelay (10);
-    MmioOr32 (USB20_WRAP_RESET, USB20_WRAP1_CORE_RESET);
-    MmioAnd32 (USB20_PHY_RESET, ~USB20_PHY1_RESET);
+    Status = A210ScmiReset (Fdt, Node, "dwc2", FALSE);
+    if (!EFI_ERROR (Status))
+      Status = A210ScmiReset (Fdt, Usb2Phy, "phy", TRUE);
+    if (EFI_ERROR (Status))
+      return Status;
     MicroSecondDelay (100);
     MmioAndThenOr32 (Phy + PHY_ANALOG, ~PHY_TX_LEVEL_MASK, PHY_TX_LEVEL);
     MmioOr32 (Phy + PHY_CONFIG, PHY1_PULLDOWNS);
-    MmioOr32 (USB20_PHY_RESET, USB20_PHY1_RESET);
-    MmioOr32 (USB20_WRAP_RESET, USB20_WRAP1_RESETS);
+    Status = A210ScmiReset (Fdt, Usb2Phy, "phy", FALSE);
+    if (EFI_ERROR (Status))
+      return Status;
     MicroSecondDelay (1000);
     // Force the dedicated host controller; keep the download port alone.
     MmioAndThenOr32 (*Base + 0x0c, ~BIT30, BIT29);
     MicroSecondDelay (25000);
     return EFI_SUCCESS;
   }
-  MmioOr32 (USB31_CLOCK, USB31_GATES);
-  MmioOr32 (USB_C10_CLOCK, BIT0 | BIT4);
-  MmioOr32 (USB31_RESET, USB31_APB_RESET | USB31_AFENCE_RESET);
-  MmioAnd32 (USB31_RESET, ~(USB31_CORE_RESET | USB31_PHY_RESET));
-  MmioOr32 (USB_C10_RESET, C10_APB_RESET);
-  MmioAnd32 (USB_C10_RESET, ~C10_PHY_RESET);
+  Status = A210ScmiClocksEnable (Fdt, Usb3Phy);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Node, NULL, TRUE);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Usb2Phy, "phy", TRUE);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Usb3Phy, "apb", FALSE);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Usb3Phy, "phy", TRUE);
+  if (EFI_ERROR (Status))
+    return Status;
   MicroSecondDelay (100);
   MmioAndThenOr32 (Phy + USB31_OTG_CONTROL,
                    ~USB31_OTG_DISABLE, USB31_VBUS_COMPARE);
@@ -214,8 +205,13 @@ A210UsbHostInit (BOOLEAN Usb3, UINTN *Base)
   MicroSecondDelay (100);
   MmioOr32 (Tca + TCA_CLOCK_RESET, TCA_RESET_RELEASE);
   A210UsbOrientation (Typec ? Fusb302Detached : Fusb302Cc1);
-  MmioOr32 (USB_C10_RESET, C10_PHY_RESET);
-  MmioOr32 (USB31_RESET, USB31_PHY_RESET | USB31_CORE_RESET);
+  Status = A210ScmiReset (Fdt, Usb3Phy, "phy", FALSE);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Usb2Phy, "phy", FALSE);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Node, NULL, FALSE);
+  if (EFI_ERROR (Status))
+    return Status;
   MicroSecondDelay (1000);
   UINT32 Id = MmioRead32 (*Base + DWC3_GSNPSID) & 0xffff0000U;
   if (Id != 0x33310000U && Id != 0x55330000U)

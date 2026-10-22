@@ -13,6 +13,7 @@
   A210Pkg/A210Pkg.dec
   RiscVPlatformPkg/RiscVPlatformPkg.dec
 [LibraryClasses]
+  A210ScmiLib
   A210PeripheralLib
   BaseLib
   DebugLib
