@@ -2,21 +2,14 @@
 #include <Uefi.h>
 #include <A210.h>
 #include <Library/IoLib.h>
+#include <Library/A210PeripheralLib.h>
+#include <Library/A210ScmiLib.h>
+#include <Library/FdtLib.h>
 #include <Library/TimerLib.h>
 #include <Library/UsbDevicePlatformLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Protocol/FdtClient.h>
 
-#define USB_BLOCK_CLOCK (A210_USB_CPR_BASE + 0x010)
-#define USB_WRAP_CLOCK (A210_USB_CPR_BASE + 0x014)
-#define USB_BLOCK_RESET (A210_USB_CPR_BASE + 0x110)
-#define USB_WRAP_RESET (A210_USB_CPR_BASE + 0x114)
-#define USB_PHY_RESET (A210_USB_CPR_BASE + 0x118)
-#define USB_BLOCK_GATES                                                   \
-  (BIT0 | BIT4 | BIT8 | BIT16 | BIT20 | BIT24 | BIT28)
-#define USB_WRAP0_GATES (BIT0 | BIT16 | BIT20)
-#define USB_WRAP0_RESETS (BIT0 | BIT4 | BIT16 | BIT20)
-#define USB_PHY0_RESET_N BIT0
 #define USB_PHY_ANALOG (A210_USB_PHY_BASE + 0x000)
 #define USB_PHY_CONFIG (A210_USB_PHY_BASE + 0x004)
 #define USB_PHY_DM_PULLDOWN BIT1
@@ -26,13 +19,32 @@
 EFI_STATUS
 UsbDevicePlatformInit (UINTN *Base)
 {
-  if (Base == NULL)
+  CONST VOID *Fdt = A210GetFdt ();
+  INT32 Node, Phy;
+  UINTN Address, Size;
+  EFI_STATUS Status;
+  if (!Base || !Fdt)
     return EFI_INVALID_PARAMETER;
-  MmioOr32 (USB_BLOCK_CLOCK, USB_BLOCK_GATES);
-  MmioOr32 (USB_WRAP_CLOCK, USB_WRAP0_GATES);
-  MmioOr32 (USB_BLOCK_RESET, USB_BLOCK_GATES);
-  MmioOr32 (USB_WRAP_RESET, USB_WRAP0_RESETS);
-  MmioOr32 (USB_PHY_RESET, USB_PHY0_RESET_N);
+  Node = FdtNodeOffsetByCompatible (Fdt, -1, "zhihe,a210-usb");
+  if (!A210NodeEnabled (Fdt, Node)
+      || EFI_ERROR (A210Reg (Fdt, Node, 0, &Address, &Size))
+      || Address != A210_USB_DEVICE_BASE || Size < 0x40000)
+    return EFI_UNSUPPORTED;
+  Phy = A210Reference (Fdt, Node, "phys");
+  if (!A210NodeEnabled (Fdt, Phy)
+      || !A210PropertyIs (Fdt, Phy, "compatible", "zhihe,a210-usb2-phy"))
+    return EFI_UNSUPPORTED;
+  Status = A210ScmiPowerOn (Fdt, Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Fdt, Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Fdt, Phy);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiResetsDeassert (Fdt, Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiResetsDeassert (Fdt, Phy);
+  if (EFI_ERROR (Status))
+    return Status;
   MmioOr32 (USB_PHY_CONFIG, USB_PHY_DM_PULLDOWN);
   MmioAndThenOr32 (USB_PHY_ANALOG, ~USB_TX_LEVEL_MASK, USB_TX_LEVEL);
   MicroSecondDelay (1000);
