@@ -5,6 +5,7 @@
 #include <A210.h>
 #include <Library/A210PeripheralLib.h>
 #include <Library/A210PciLib.h>
+#include <Library/A210ScmiLib.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>

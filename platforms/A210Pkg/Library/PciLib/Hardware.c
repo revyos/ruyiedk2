@@ -5,24 +5,6 @@
 #include <A210.h>
 
 
-#define PCIE_CLOCK(Index) (A210_PCIE_CRG + 0x20 + (Index) * 4)
-#define PCIE_RESET(Index) (A210_PCIE_CRG + 0x120 + (Index) * 4)
-#define PCIE_CLOCK_GATES (BIT0 | BIT4 | BIT8 | BIT12)
-#define PCIE_DBI_RESET BIT0
-#define PCIE_POWER_RESET BIT4
-#define PCIE_AFENCE_RESETS (BIT16 | BIT20)
-#define BPC_BYPASS 0x00
-#define BPC_POWER_CONTROL 0x04
-#define BPC_POWER_REQUESTS (BIT0 | BIT8 | BIT16)
-#define PCU_REQUEST 0x08
-#define PCU_LOW_POWER_STATE 0x0c
-#define PCU_IRQ_ENABLE 0x24
-#define PCU_IRQ_CLEAR 0x28
-#define PCU_IRQ_STATUS 0x2c
-#define PCU_ON 0x1f
-#define PCU_IRQ_MASK 0x3f
-#define PCU_ACCEPT (BIT0 | BIT3)
-#define PCU_REJECT (BIT1 | BIT2 | BIT4 | BIT5)
 #define PAD_INPUT BIT9
 #define PAD_SCHMITT BIT7
 #define PAD_PULL_UP (BIT4 | BIT5)
@@ -46,6 +28,11 @@ ConfigurePins (CONST VOID *Fdt, INT32 Node)
                             0, &Base, &Size))
         || Base != A210_PERI1_PAD_BASE)
       return EFI_UNSUPPORTED;
+    EFI_STATUS Status = A210ScmiClocksEnable (Fdt, FdtParentOffset (Fdt, Group));
+    if (!EFI_ERROR (Status))
+      Status = A210ScmiResetsDeassert (Fdt, FdtParentOffset (Fdt, Group));
+    if (EFI_ERROR (Status))
+      return Status;
     FdtForEachSubnode (Child, Fdt, Group)
     {
       CONST CHAR8 *Pins;
@@ -97,36 +84,6 @@ ConfigurePins (CONST VOID *Fdt, INT32 Node)
   return EFI_SUCCESS;
 }
 
-STATIC EFI_STATUS
-PowerOn (CONST VOID *Fdt, A210_PCIE *Pcie)
-{
-  INT32 Domain = A210Reference (Fdt, Pcie->Node, "power-domains");
-  UINTN Bpc, Pcu, Size, Timeout;
-  UINT32 Value;
-  if (EFI_ERROR (A210Reg (Fdt, Domain, 0, &Bpc, &Size))
-      || EFI_ERROR (A210Reg (Fdt, Domain, 1, &Pcu, &Size))
-      || Pcu != 0x0a006000 + Pcie->Index * 0x400 || Bpc != Pcu + 0x200)
-    return EFI_UNSUPPORTED;
-  MmioWrite32 (Bpc + BPC_BYPASS, 0);
-  MmioWrite32 (Bpc + BPC_POWER_CONTROL, BPC_POWER_REQUESTS);
-  MmioWrite32 (Pcu + PCU_IRQ_CLEAR, PCU_IRQ_MASK);
-  MmioWrite32 (Pcu + PCU_IRQ_ENABLE, PCU_IRQ_MASK);
-  MmioWrite32 (Pcu + PCU_LOW_POWER_STATE, PCU_ON);
-  MmioWrite32 (Pcu + PCU_REQUEST, 1);
-  for (Timeout = 0; Timeout < 10000; Timeout += 10)
-  {
-    Value = MmioRead32 (Pcu + PCU_IRQ_STATUS);
-    if (Value)
-    {
-      MmioWrite32 (Pcu + PCU_IRQ_CLEAR, Value);
-      return !(Value & PCU_REJECT) && (Value & PCU_ACCEPT)
-                 ? EFI_SUCCESS : EFI_DEVICE_ERROR;
-    }
-    MicroSecondDelay (10);
-  }
-  return EFI_TIMEOUT;
-}
-
 STATIC UINTN
 PcieCapability (UINTN Dbi)
 {
@@ -167,19 +124,23 @@ A210PcieHardwareInit (CONST VOID *Fdt, A210_PCIE *Pcie)
     if (EFI_ERROR (Status) && Status != EFI_NOT_FOUND)
       return Status;
   }
-  MmioOr32 (PCIE_CLOCK (Pcie->Index), PCIE_CLOCK_GATES);
-  Status = PowerOn (Fdt, Pcie);
-  if (EFI_ERROR (Status))
-    return Status;
-  MmioAnd32 (PCIE_RESET (Pcie->Index), ~PCIE_POWER_RESET);
-  MmioOr32 (PCIE_RESET (Pcie->Index), PCIE_DBI_RESET | PCIE_AFENCE_RESETS);
-  MmioAndThenOr32 (Pcie->App + A210_PCIE_CONTROL,
-                   ~(0x1fU | A210_PCIE_LTSSM), A210_PCIE_ROOT_PORT);
   Phy = A210Reference (Fdt, Pcie->Node, "phys");
   Status = A210PciePhyInit (Fdt, Phy);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiPowerOn (Fdt, Pcie->Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Fdt, Pcie->Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Pcie->Node, "pwr", TRUE);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Pcie->Node, "dbi", FALSE);
   if (EFI_ERROR (Status))
     return Status;
-  MmioOr32 (PCIE_RESET (Pcie->Index), PCIE_POWER_RESET);
+  MmioAndThenOr32 (Pcie->App + A210_PCIE_CONTROL,
+                   ~(0x1fU | A210_PCIE_LTSSM), A210_PCIE_ROOT_PORT);
+  Status = A210ScmiReset (Fdt, Pcie->Node, "pwr", FALSE);
+  if (EFI_ERROR (Status))
+    return Status;
   MicroSecondDelay (100);
   Cap = PcieCapability (Dbi);
   if (!Cap)

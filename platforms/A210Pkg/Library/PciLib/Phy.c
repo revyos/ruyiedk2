@@ -4,10 +4,6 @@
 #include "Pci.h"
 
 
-#define E16_CLOCK (A210_PCIE_CRG + 0x08)
-#define E16_RESET (A210_PCIE_CRG + 0x108)
-#define E16_APB_RESET BIT4
-#define E16_PHY_RESET BIT0
 #define E16_SYSREG 0x0a180000
 #define E16_PHY0 0x0a100000
 #define E16_PHY1 0x0a140000
@@ -115,16 +111,22 @@ A210PciePhyInit (CONST VOID *Fdt, INT32 Node)
   Status = ReferenceClock (Fdt, Node);
   if (EFI_ERROR (Status))
     return Status;
-  MmioOr32 (E16_CLOCK, BIT0);
-  MmioOr32 (E16_RESET, E16_APB_RESET);
-  MmioAnd32 (E16_RESET, ~E16_PHY_RESET);
+  Status = A210ScmiClockEnable (Fdt, Node, "apb");
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Node, "apb", FALSE);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiReset (Fdt, Node, "phy", TRUE);
+  if (EFI_ERROR (Status))
+    return Status;
   MicroSecondDelay (100);
   MmioWrite32 (Base[0] + E16_GLOBAL, Control);
   MmioWrite32 (Base[0] + E16_PORT_SOURCE, Sata ? E16_SATA_SOURCE : 0);
   MmioWrite32 (Base[0] + E16_PROTOCOL, Sata ? E16_SATA_PROTOCOL : 0);
   MmioWrite32 (Base[0] + E16_PCIE_OVERRIDE, E16_PCIE_OVERRIDE_ENABLE);
   MmioWrite32 (Base[0] + E16_RES_TUNE, E16_RES_ACK_IN);
-  MmioOr32 (E16_RESET, E16_PHY_RESET);
+  Status = A210ScmiReset (Fdt, Node, "phy", FALSE);
+  if (EFI_ERROR (Status))
+    return Status;
   Status = A210Wait32 (Base[0] + E16_SRAM_STATUS,
                        E16_SRAM_READY, E16_SRAM_READY, 100000);
   if (EFI_ERROR (Status))
@@ -156,7 +158,7 @@ A210PciePhyInit (CONST VOID *Fdt, INT32 Node)
   Initialized = TRUE;
   return EFI_SUCCESS;
 Failed:
-  MmioAnd32 (E16_RESET, ~E16_PHY_RESET);
+  (VOID)A210ScmiReset (Fdt, Node, "phy", TRUE);
   DEBUG ((DEBUG_ERROR, "A210 E16 PHY: %r\n", Status));
   return Status;
 }
