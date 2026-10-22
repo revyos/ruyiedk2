@@ -21,6 +21,7 @@
 [BuildOptions.common.EDKII.DXE_RUNTIME_DRIVER]
   GCC:*_*_*_DLINK_FLAGS = -z common-page-size=0x1000
 [LibraryClasses.common]
+  A210ScmiLib|A210Pkg/Library/ScmiLib/ScmiLib.inf
   ArmMtlLib|A210Pkg/Library/ScmiMtlLib/ScmiMtlLib.inf
   A210PciLib|A210Pkg/Library/PciLib/PciLib.inf
   PciHostBridgeLib|A210Pkg/Library/PciHostBridgeLib/PciHostBridgeLib.inf

@@ -508,3 +508,13 @@ edk2-a210-scmi-check:
 		-Iplatforms/A210Pkg/Include tests/edk2-a210-scmi.c \
 		tests/edk2-fdt-host.c -lfdt -o $(EDK2_BUILD)/test-a210-scmi
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-a210-scmi $(SCMI_DTBS)
+
+.PHONY: edk2-a210-scmi-resources-check
+edk2-a210-scmi-resources-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) $(FDT_TEST_FLAGS) -DMDEPKG_NDEBUG \
+		-I$(EDK2_SOURCE)/ArmPkg/Include -Iplatforms/A210Pkg/Include \
+		tests/edk2-a210-scmi-resources.c tests/edk2-fdt-host.c \
+		platforms/A210Pkg/Library/ScmiLib/Resources.c \
+		-lfdt -o $(EDK2_BUILD)/test-a210-scmi-resources
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-a210-scmi-resources $(firstword $(SCMI_DTBS))
