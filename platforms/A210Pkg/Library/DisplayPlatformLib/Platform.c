@@ -2,7 +2,8 @@
 #include <PiDxe.h>
 #include <A210.h>
 #include <Guid/FdtHob.h>
-#include <Library/A210ClockLib.h>
+#include <Library/A210PeripheralLib.h>
+#include <Library/A210ScmiLib.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DisplayPlatformLib.h>
@@ -11,27 +12,10 @@
 #include <Library/IoLib.h>
 #include <Library/TimerLib.h>
 
-#define VO_CLOCK_ENABLE 0x200
-#define VO_RESET_N 0x400
-#define VO_PATH_CONTROL 0x48
-#define VO_PIXEL_DIVIDER 0x204
-#define VO_HDMI_SOURCE_MASK (3U << 2)
-#define VO_HDMI_SOURCE_CH1 (1U << 2)
-#define VO_CH1_DIV_MASK (0xffU << 10)
-#define VO_CH1_DIV_ENABLE BIT18
-#define VO_DISPLAY_CLOCKS                                                 \
-  (BIT1 | BIT2 | BIT3 | BIT4 | BIT8 | BIT11 | BIT18 | BIT19 | BIT20       \
-   | BIT21 | BIT23 | BIT24)
-#define VO_DISPLAY_RESETS                                                 \
-  (BIT0 | BIT1 | BIT2 | BIT3 | BIT4 | BIT8 | BIT9 | BIT15 | BIT16 | BIT17 \
-   | BIT18)
-#define VO_PCU_ACTIVE 0x10
 #define HDMI_PHY_CONTROL (0x3000 * 4)
 #define HDMI_PHY_RESET (0x4005 * 4)
 #define HDMI_PHY_HPD_ENABLE BIT2
 #define HDMI_PHY_SVSRET BIT5
-#define PAD_CLOCK_ENABLE (A210_PERI2_BASE + 0x200)
-#define PAD_RESET_N (A210_PERI2_BASE + 0x400)
 #define PAD_MUX_OFFSET 0x400
 #define PAD_HDMI_FUNCTION 4U
 #define PAD_HDMI_CONFIG (BIT9 | 2U)
@@ -77,7 +61,9 @@ ConfigurePins (DISPLAY_HW *Hw)
 {
   CONST UINT32 *Ref;
   CONST CHAR8 *Function, *Pins;
-  INT32 Length, Group, Child;
+  INT32 Length, Group, Child, Pad;
+  UINTN Base, Size;
+  EFI_STATUS Status;
   UINT32 Seen = 0;
   Ref = FdtGetProp (Hw->Fdt, Hw->HdmiNode, "pinctrl-0", &Length);
   if (!Ref || Length != 4)
@@ -86,8 +72,15 @@ ConfigurePins (DISPLAY_HW *Hw)
                                   SwapBytes32 (ReadUnaligned32 (Ref)));
   if (Group < 0)
     return EFI_NOT_FOUND;
-  MmioOr32 (PAD_CLOCK_ENABLE, BIT13);
-  MmioOr32 (PAD_RESET_N, BIT18);
+  Pad = FdtParentOffset (Hw->Fdt, Group);
+  if (EFI_ERROR (A210Reg (Hw->Fdt, Pad, 0, &Base, &Size))
+      || Base != A210_PERI2_PAD_BASE)
+    return EFI_UNSUPPORTED;
+  Status = A210ScmiClocksEnable (Hw->Fdt, Pad);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiResetsDeassert (Hw->Fdt, Pad);
+  if (EFI_ERROR (Status))
+    return Status;
   FdtForEachSubnode (Child, Hw->Fdt, Group)
   {
     Function = FdtGetProp (Hw->Fdt, Child, "function", &Length);
@@ -118,10 +111,21 @@ ConfigurePins (DISPLAY_HW *Hw)
 EFI_STATUS
 DisplayPlatformPrepare (DISPLAY_HW *Hw)
 {
-  if (!(MmioRead32 (A210_VO_PCU_BASE + VO_PCU_ACTIVE) & BIT0))
-    return EFI_NOT_READY;
-  MmioOr32 (A210_VO_BASE + VO_CLOCK_ENABLE, VO_DISPLAY_CLOCKS);
-  MmioOr32 (A210_VO_BASE + VO_RESET_N, VO_DISPLAY_RESETS);
+  INT32 Dc = FdtNodeOffsetByCompatible (Hw->Fdt, -1, "zhihe,a210-dc8200");
+  EFI_STATUS Status;
+  if (!A210NodeEnabled (Hw->Fdt, Dc))
+    return EFI_NOT_FOUND;
+  Status = A210ScmiPowerOn (Hw->Fdt, Dc);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Hw->Fdt, Dc);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiResetsDeassert (Hw->Fdt, Dc);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Hw->Fdt, Hw->HdmiNode);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiResetsDeassert (Hw->Fdt, Hw->HdmiNode);
+  if (EFI_ERROR (Status))
+    return Status;
   MmioOr32 (Hw->Hdmi + HDMI_PHY_CONTROL,
             HDMI_PHY_HPD_ENABLE | HDMI_PHY_SVSRET);
   MmioWrite32 (Hw->Hdmi + HDMI_PHY_RESET, 0);
@@ -131,25 +135,9 @@ DisplayPlatformPrepare (DISPLAY_HW *Hw)
 EFI_STATUS
 DisplayPlatformPixelClock (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *Timing)
 {
-  UINT64 Parent = A210DisplayClock ();
-  UINT32 Divider;
-  (VOID) Hw;
-  if (!Parent || !Timing->Clock)
-    return EFI_UNSUPPORTED;
-  Divider = (UINT32)((Parent + Timing->Clock - 1) / Timing->Clock);
-  if (Divider < 2 || Divider > 255)
-    return EFI_UNSUPPORTED;
-  // Latch only the channel divider; retain the power-on DPU PLL.
-  MmioAnd32 (A210_VO_BASE + VO_CLOCK_ENABLE, ~BIT1);
-  MmioAnd32 (A210_VO_BASE + VO_PIXEL_DIVIDER, ~VO_CH1_DIV_ENABLE);
-  MmioAndThenOr32 (A210_VO_BASE + VO_PIXEL_DIVIDER, ~VO_CH1_DIV_MASK,
-                   Divider << 10);
-  MmioOr32 (A210_VO_BASE + VO_PIXEL_DIVIDER, VO_CH1_DIV_ENABLE);
-  MmioAndThenOr32 (A210_VO_BASE + VO_PATH_CONTROL, ~VO_HDMI_SOURCE_MASK,
-                   VO_HDMI_SOURCE_CH1);
-  MmioOr32 (A210_VO_BASE + VO_CLOCK_ENABLE, BIT1);
-  MicroSecondDelay (10);
-  return EFI_SUCCESS;
+  if (!Timing->Clock)
+    return EFI_INVALID_PARAMETER;
+  return A210ScmiClockSet (Hw->Fdt, Hw->HdmiNode, "pix", Timing->Clock);
 }
 VOID
 DisplayPlatformPhyConfig (DISPLAY_HW *Hw, CONST DISPLAY_TIMING *Timing,

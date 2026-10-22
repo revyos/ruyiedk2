@@ -13,7 +13,8 @@
   A210Pkg/A210Pkg.dec
   RiscVPlatformPkg/RiscVPlatformPkg.dec
 [LibraryClasses]
-  A210ClockLib
+  A210PeripheralLib
+  A210ScmiLib
   BaseLib
   BaseMemoryLib
   FdtLib
