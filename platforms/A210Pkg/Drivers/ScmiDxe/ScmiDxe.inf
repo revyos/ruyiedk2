@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210ScmiDxe
+  FILE_GUID = 167a7a80-e859-441a-8d77-d549c304c5b2
+  MODULE_TYPE = DXE_DRIVER
+  ENTRY_POINT = A210ScmiInitialize
+[Sources]
+  Scmi.c
+[Packages]
+  MdePkg/MdePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  FdtLib
+  HobLib
+  IoLib
+  TimerLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+[Guids]
+  gFdtHobGuid
+  gEfiEventExitBootServicesGuid
+[Protocols]
+  gA210ScmiProtocolGuid
+[Depex]
+  TRUE

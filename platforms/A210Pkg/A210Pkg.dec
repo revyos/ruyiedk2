@@ -12,3 +12,6 @@
   A210UsbHostLib|Include/Library/A210UsbHostLib.h
   A210ClockLib|Include/Library/A210ClockLib.h
   A210BootMediaLib|Include/Library/A210BootMediaLib.h
+
+[Protocols]
+  gA210ScmiProtocolGuid = { 0x920b9fd0, 0x85f4, 0x4a4f, { 0x8d, 0xe2, 0x9f, 0xab, 0x34, 0x0c, 0x7a, 0x10 } }

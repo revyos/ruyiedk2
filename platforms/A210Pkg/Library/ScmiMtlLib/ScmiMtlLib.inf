@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+[Defines]
+  INF_VERSION = 0x0001001b
+  BASE_NAME = A210ScmiMtlLib
+  FILE_GUID = d1e16b2d-75c1-4891-a906-fc6ac73a38a9
+  MODULE_TYPE = DXE_DRIVER
+  LIBRARY_CLASS = ArmMtlLib|DXE_DRIVER
+[Sources]
+  Mtl.c
+[Packages]
+  MdePkg/MdePkg.dec
+  ArmPkg/ArmPkg.dec
+  A210Pkg/A210Pkg.dec
+[LibraryClasses]
+  UefiBootServicesTableLib
+[Protocols]
+  gA210ScmiProtocolGuid
+[Depex]
+  gA210ScmiProtocolGuid
