@@ -13,6 +13,7 @@ EFI_STATUS A210Reg (CONST VOID *Fdt, INT32 Node, UINTN Index,
                     UINTN *Base, UINTN *Size);
 typedef struct {
   UINT8 Address;
+  UINT32 ClockHz;
 } A210_I2C_DEVICE;
 EFI_STATUS A210I2cDevice (CONST VOID *Fdt, INT32 Node,
                           A210_I2C_DEVICE *Device);

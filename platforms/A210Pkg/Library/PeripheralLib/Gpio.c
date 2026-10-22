@@ -2,6 +2,7 @@
 #include <Uefi.h>
 #include <A210.h>
 #include <Library/A210PeripheralLib.h>
+#include <Library/A210ScmiLib.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/FdtLib.h>
@@ -58,7 +59,11 @@ SetGpio (CONST VOID *Fdt, CONST UINT32 *Spec,
 {
   INT32 Node = FdtNodeOffsetByPhandle (Fdt, A210Cell (Spec));
   UINT32 Pin = A210Cell (Spec + 1), Flags = A210Cell (Spec + 2);
-  UINTN Base, Size, Pad, PadBase;
+  STATIC BOOLEAN Prepared[2];
+  UINTN Base, Size, Pad, PadBase, Group;
+  CONST UINT32 *Ranges;
+  INT32 Length, PadNode, Bus;
+  EFI_STATUS Status;
   BOOLEAN High = Asserted != ((Flags & 1) != 0);
   if (!A210NodeEnabled (Fdt, Node) || Flags & ~1U)
     return EFI_UNSUPPORTED;
@@ -71,8 +76,6 @@ SetGpio (CONST VOID *Fdt, CONST UINT32 *Spec,
   Pad = Pin;
   if (Base == A210_GPIO0_BASE)
   {
-    MmioOr32 (A210_PERI1_BASE + 0x200, BIT5);
-    MmioOr32 (A210_PERI1_BASE + 0x400, BIT5);
     PadBase = A210_PERI1_PAD_BASE;
   }
   else if (Base == A210_AON_GPIO_BASE && (Pin == 26 || Pin == 29))
@@ -82,6 +85,27 @@ SetGpio (CONST VOID *Fdt, CONST UINT32 *Spec,
   }
   else
     return EFI_UNSUPPORTED;
+  Bus = FdtParentOffset (Fdt, Node);
+  Ranges = FdtGetProp (Fdt, Node, "gpio-ranges", &Length);
+  if (!Ranges || Length != 16)
+    return EFI_UNSUPPORTED;
+  PadNode = FdtNodeOffsetByPhandle (Fdt, A210Cell (Ranges));
+  if (!A210NodeEnabled (Fdt, PadNode))
+    return EFI_UNSUPPORTED;
+  Group = Base == A210_AON_GPIO_BASE;
+  if (!Prepared[Group])
+  {
+    Status = A210ScmiClocksEnable (Fdt, Bus);
+    if (!EFI_ERROR (Status))
+      Status = A210ScmiResetsDeassert (Fdt, Bus);
+    if (!EFI_ERROR (Status))
+      Status = A210ScmiClocksEnable (Fdt, PadNode);
+    if (!EFI_ERROR (Status))
+      Status = A210ScmiResetsDeassert (Fdt, PadNode);
+    if (EFI_ERROR (Status))
+      return Status;
+    Prepared[Group] = TRUE;
+  }
   if (Output)
     MmioAndThenOr32 (Base + GPIO_DATA, ~(1U << Pin),
                      High ? 1U << Pin : 0);
