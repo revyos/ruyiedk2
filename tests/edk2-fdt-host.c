@@ -139,3 +139,8 @@ FdtCheckHeader (CONST VOID *F)
 {
   return fdt_check_header (F);
 }
+INT32 EFIAPI
+FdtPathOffset (CONST VOID *F, CONST CHAR8 *Path)
+{
+  return fdt_path_offset (F, Path);
+}
