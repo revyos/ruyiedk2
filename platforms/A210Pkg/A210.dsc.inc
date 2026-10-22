@@ -21,6 +21,7 @@
 [BuildOptions.common.EDKII.DXE_RUNTIME_DRIVER]
   GCC:*_*_*_DLINK_FLAGS = -z common-page-size=0x1000
 [LibraryClasses.common]
+  ArmMtlLib|A210Pkg/Library/ScmiMtlLib/ScmiMtlLib.inf
   A210PciLib|A210Pkg/Library/PciLib/PciLib.inf
   PciHostBridgeLib|A210Pkg/Library/PciHostBridgeLib/PciHostBridgeLib.inf
   PciSegmentLib|MdePkg/Library/UefiPciSegmentLibPciRootBridgeIo/UefiPciSegmentLibPciRootBridgeIo.inf
@@ -98,6 +99,8 @@
 [PcdsDynamicHii]
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|L"Timeout"|gEfiGlobalVariableGuid|0x0|10
 [Components]
+  A210Pkg/Drivers/ScmiDxe/ScmiDxe.inf
+  ArmPkg/Drivers/ArmScmiDxe/ArmScmiDxe.inf
   UefiCpuPkg/SecCore/SecCoreNative.inf {
     <LibraryClasses>
       ExtractGuidedSectionLib|EmbeddedPkg/Library/PrePiExtractGuidedSectionLib/PrePiExtractGuidedSectionLib.inf

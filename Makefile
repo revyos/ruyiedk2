@@ -499,3 +499,12 @@ edk2-typec-check:
 		platforms/RiscVPlatformPkg/Library/Fusb302Lib/Fusb302.c \
 		-o $(EDK2_BUILD)/test-fusb302
 	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-fusb302
+
+.PHONY: edk2-a210-scmi-check
+SCMI_DTBS ?= $(EDK2_BUILD)/firmware.dtb
+edk2-a210-scmi-check:
+	mkdir -p $(EDK2_BUILD)
+	$(CC) $(FDT_TEST_FLAGS) -DMDEPKG_NDEBUG \
+		-Iplatforms/A210Pkg/Include tests/edk2-a210-scmi.c \
+		tests/edk2-fdt-host.c -lfdt -o $(EDK2_BUILD)/test-a210-scmi
+	ASAN_OPTIONS=detect_leaks=0 $(EDK2_BUILD)/test-a210-scmi $(SCMI_DTBS)

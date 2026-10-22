@@ -25,6 +25,8 @@ PlatformResourceInit (IN VOID *Fdt)
     return EFI_UNSUPPORTED;
   }
 
+  AddMmio (0x00311000, 0x1000); // AP-to-E902 doorbell
+  AddMmio (0x30907000, 0x1000); // SCMI shared SRAM
   AddMmio (A210_VO_BASE, A210_SYSREG_SIZE);
   AddMmio (A210_VO_PCU_BASE, A210_SYSREG_SIZE);
   AddMmio (A210_DC_BASE, A210_DC_SIZE);
