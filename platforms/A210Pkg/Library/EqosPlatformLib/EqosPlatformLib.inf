@@ -14,7 +14,7 @@
   A210Pkg/A210Pkg.dec
   RiscVPlatformPkg/RiscVPlatformPkg.dec
 [LibraryClasses]
-  A210ClockLib
+  A210ScmiLib
   A210BootMediaLib
   MemoryAllocationLib
   BaseLib
