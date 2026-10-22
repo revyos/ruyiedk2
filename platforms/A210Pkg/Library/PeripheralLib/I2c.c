@@ -2,6 +2,7 @@
 #include <Uefi.h>
 #include <A210.h>
 #include <Library/A210PeripheralLib.h>
+#include <Library/A210ScmiLib.h>
 #include <Library/FdtLib.h>
 #include <Library/IoLib.h>
 #include <Library/TimerLib.h>
@@ -50,28 +51,13 @@ Wait (UINTN Offset, UINT32 Mask, UINT32 Value, UINT64 Start)
 }
 
 STATIC EFI_STATUS
-I2cByte (UINT8 Address, UINT8 Register, UINT8 *Data, BOOLEAN Read)
+I2cByte (UINT8 Address, UINT32 Hz, UINT8 Register, UINT8 *Data, BOOLEAN Read)
 {
-  STATIC CONST UINT32 Sources[] = {110000000, 24000000, 26000000, 32768};
-  UINT32 Clock, Hz, Count;
-  UINTN Pin;
+  UINT32 Count;
   UINT64 Start = GetPerformanceCounter ();
   EFI_STATUS Status;
-  Clock = MmioRead32 (A210_AON_CLOCK_BASE);
-  Hz = Sources[(Clock >> 4) & 3] / ((Clock & 7) + 1);
   if (Hz < 1000000)
     return EFI_UNSUPPORTED;
-  MmioOr32 (A210_AON_CLOCK_BASE + 4, BIT20 | BIT21);
-  MmioOr32 (A210_AON_RESET_BASE + 0x10, BIT1);
-  for (Pin = 15; Pin <= 16; Pin++)
-  {
-    UINTN Shift = Pin % 2 * 16;
-    MmioAnd32 (A210_AON_PAD_BASE + 0x400 + Pin / 8 * 4,
-               ~(0xfU << (Pin % 8 * 4)));
-    MmioAndThenOr32 (A210_AON_PAD_BASE + Pin / 2 * 4,
-                     ~(0x3ffU << Shift),
-                     (BIT9 | BIT8 | BIT7 | 15U) << Shift);
-  }
   Status = Wait (IC_STATUS, BIT0, 0, Start);
   if (EFI_ERROR (Status))
     return Status;
@@ -130,8 +116,12 @@ Done:
 EFI_STATUS
 A210I2cDevice (CONST VOID *Fdt, INT32 Node, A210_I2C_DEVICE *Device)
 {
+  STATIC UINT32 ClockHz;
   CONST UINT32 *Reg;
-  UINTN Base, Size;
+  UINTN Base, Size, Pin;
+  UINT64 Rate;
+  EFI_STATUS Status;
+  INT32 Pad;
   INT32 Length, Bus = FdtParentOffset (Fdt, Node);
 
   if (!Device || !A210NodeEnabled (Fdt, Node)
@@ -143,6 +133,36 @@ A210I2cDevice (CONST VOID *Fdt, INT32 Node, A210_I2C_DEVICE *Device)
       || Base != A210_AON_I2C1_BASE || Size < 0x100)
     return EFI_UNSUPPORTED;
   Device->Address = A210Cell (Reg);
+  if (ClockHz)
+  {
+    Device->ClockHz = ClockHz;
+    return EFI_SUCCESS;
+  }
+  Pad = FdtNodeOffsetByCompatible (Fdt, -1, "zhihe,a210-aon-pinctrl");
+  if (!A210NodeEnabled (Fdt, Pad))
+    return EFI_UNSUPPORTED;
+  Status = A210ScmiClocksEnable (Fdt, Bus);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiResetsDeassert (Fdt, Bus);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Fdt, Pad);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClockGet (Fdt, Bus, "ref", &Rate);
+  if (EFI_ERROR (Status))
+    return Status;
+  if (Rate < 1000000 || Rate > MAX_UINT32)
+    return EFI_UNSUPPORTED;
+  Device->ClockHz = (UINT32)Rate;
+  for (Pin = 15; Pin <= 16; Pin++)
+  {
+    UINTN Shift = Pin % 2 * 16;
+    MmioAnd32 (A210_AON_PAD_BASE + 0x400 + Pin / 8 * 4,
+               ~(0xfU << (Pin % 8 * 4)));
+    MmioAndThenOr32 (A210_AON_PAD_BASE + Pin / 2 * 4,
+                     ~(0x3ffU << Shift),
+                     (BIT9 | BIT8 | BIT7 | 15U) << Shift);
+  }
+  ClockHz = Device->ClockHz;
   return EFI_SUCCESS;
 }
 
@@ -157,7 +177,7 @@ A210I2cByte (CONST A210_I2C_DEVICE *Device, UINT8 Register,
     return EFI_INVALID_PARAMETER;
   // Resolve the DT once; never scan it from the Type-C polling path.
   Tpl = gBS->RaiseTPL (TPL_NOTIFY);
-  Status = I2cByte (Device->Address, Register, Data, Read);
+  Status = I2cByte (Device->Address, Device->ClockHz, Register, Data, Read);
   gBS->RestoreTPL (Tpl);
   return Status;
 }
