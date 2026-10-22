@@ -35,7 +35,6 @@
   DisplayPlatformLib|A210Pkg/Library/DisplayPlatformLib/DisplayPlatformLib.inf
   A210BootMediaLib|A210Pkg/Library/BootMediaLib/BootMediaLib.inf
   EqosPlatformLib|A210Pkg/Library/EqosPlatformLib/EqosPlatformLib.inf
-  A210ClockLib|A210Pkg/Library/ClockLib/ClockLib.inf
   PlatformSmbiosLib|A210Pkg/Library/PlatformSmbiosLib/PlatformSmbiosLib.inf
   FastbootStorageLib|RiscVPlatformPkg/Library/FastbootStorageLib/FastbootStorageLib.inf
   FastbootPlatformLib|A210Pkg/Library/FastbootPlatformLib/FastbootPlatformLib.inf
