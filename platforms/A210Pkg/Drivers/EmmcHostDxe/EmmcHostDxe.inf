@@ -14,7 +14,8 @@
   EmbeddedPkg/EmbeddedPkg.dec
   A210Pkg/A210Pkg.dec
 [LibraryClasses]
-  A210ClockLib
+  A210PeripheralLib
+  A210ScmiLib
   BaseLib
   BaseMemoryLib
   DebugLib
