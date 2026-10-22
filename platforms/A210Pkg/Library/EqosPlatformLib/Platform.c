@@ -2,7 +2,7 @@
 #include <PiDxe.h>
 #include <A210.h>
 #include <Guid/FdtHob.h>
-#include <Library/A210ClockLib.h>
+#include <Library/A210ScmiLib.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/EqosPlatformLib.h>
@@ -11,10 +11,6 @@
 #include <Library/IoLib.h>
 #include <Library/TimerLib.h>
 
-#define PERI_CLOCK0 (A210_PERI1_BASE + 0x200)
-#define PERI_CLOCK1 (A210_PERI1_BASE + 0x204)
-#define PERI_RESET0 (A210_PERI1_BASE + 0x400)
-#define PERI_RESET1 (A210_PERI1_BASE + 0x404)
 #define GMAC_CLOCK_CONTROL 0x00
 #define GMAC_INTERFACE 0x04
 #define GMAC_CLOCK_ENABLE 0x1f
@@ -107,11 +103,17 @@ ConfigurePins (GMAC_HARDWARE *Hw)
       = { 1, 2, 3, 5, 7, 8, 10, 12, 13, 15, 16, 18, 20, 21, 23, 25 };
   INT32 Group = Reference (Hw->Fdt, Hw->Node, "pinctrl-0");
   INT32 Child, Length;
+  EFI_STATUS Status;
   UINT32 Seen = 0;
   if (Group < 0
       || RegBase (Hw->Fdt, FdtParentOffset (Hw->Fdt, Group))
              != A210_PERI1_PAD_BASE)
     return EFI_UNSUPPORTED;
+  Status = A210ScmiClocksEnable (Hw->Fdt, FdtParentOffset (Hw->Fdt, Group));
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiResetsDeassert (Hw->Fdt, FdtParentOffset (Hw->Fdt, Group));
+  if (EFI_ERROR (Status))
+    return Status;
   FdtForEachSubnode (Child, Hw->Fdt, Group)
   {
     CONST CHAR8 *Pins = FdtGetProp (Hw->Fdt, Child, "pins", &Length);
@@ -192,19 +194,22 @@ GmacSetSpeed (GMAC_HARDWARE *Hw, UINTN Speed)
 EFI_STATUS
 GmacPlatformInitialize (GMAC_HARDWARE *Hw)
 {
-  EFI_STATUS Status;
-  Hw->Clock = A210PeripheralClock ();
-  if (!Hw->Clock || Hw->Clock > 500000000)
+  UINT64 Rate;
+  EFI_STATUS Status = A210ScmiPowerOn (Hw->Fdt, Hw->Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClocksEnable (Hw->Fdt, Hw->Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiResetsDeassert (Hw->Fdt, Hw->Node);
+  if (!EFI_ERROR (Status))
+    Status = A210ScmiClockGet (Hw->Fdt, Hw->Node, "stmmaceth", &Rate);
+  if (EFI_ERROR (Status))
+    return Status;
+  if (!Rate || Rate > 500000000)
     return EFI_UNSUPPORTED;
-  MmioOr32 (PERI_CLOCK1, BIT7);
-  MmioOr32 (PERI_RESET1, BIT5);
+  Hw->Clock = (UINT32)Rate;
   Status = ConfigurePins (Hw);
   if (EFI_ERROR (Status))
     return Status;
-  MmioOr32 (PERI_CLOCK0, (BIT0 | BIT1) << (Hw->Index * 2));
-  MmioOr32 (PERI_CLOCK1, (BIT0 | BIT1) << (Hw->Index * 2));
-  MmioOr32 (PERI_RESET0, Hw->Index ? BIT2 | BIT3 : BIT0 | BIT1 | BIT31);
-  MmioOr32 (PERI_RESET1, Hw->Index ? BIT1 | BIT2 : BIT0);
   MmioOr32 (Hw->Apb + GMAC_CLOCK_CONTROL, GMAC_CLOCK_ENABLE);
   MmioAndThenOr32 (Hw->Apb + GMAC_INTERFACE, ~0xfU, GMAC_RGMII);
   MicroSecondDelay (100);
