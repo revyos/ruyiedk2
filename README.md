@@ -16,7 +16,9 @@ image packaging are maintained in the parent TH1520 workspace.
 
 The build uses the sibling `../edk2` checkout with its submodules
 initialized. The upstream baseline is
-`6abc1c06585ffd66d23a74811a930d8d0f88cef7`, without local patches.
+`6abc1c06585ffd66d23a74811a930d8d0f88cef7`. A210 additionally requires
+the ArmScmiDxe INF dependency fix, which replaces unused ArmLib with the
+BaseLib, BaseMemoryLib and MemoryAllocationLib dependencies it uses.
 The platform IPv4 settings page uses standard HII and IPv4 Config2
 protocols. The parent workspace pins the EDK2 revision; the build script
 uses that checkout directly and does not apply patches automatically.
