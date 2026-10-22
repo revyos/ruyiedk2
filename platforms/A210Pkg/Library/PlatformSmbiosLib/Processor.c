@@ -2,12 +2,11 @@
 #include <Uefi.h>
 #include <A210.h>
 #include <Guid/RiscVSecHobData.h>
-#include <Library/A210ClockLib.h>
+#include <Library/A210ScmiLib.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/FdtLib.h>
 #include <Library/HobLib.h>
-#include <Library/MapMmioLib.h>
 #include <Library/PlatformSmbiosLib.h>
 #include <Library/PrintLib.h>
 
@@ -17,7 +16,7 @@ PlatformGetProcessorInfo (CONST VOID *Fdt, PLATFORM_PROCESSOR_INFO *Info)
   INT32 Cpus, Node, Length;
   CONST CHAR8 *Value;
   UINTN C908 = 0, C920 = 0;
-  EFI_STATUS Status;
+  UINT64 Rate;
   STATIC CONST EFI_GUID SecGuid = RISCV_SEC_HANDOFF_HOB_GUID;
   VOID *Hob;
 
@@ -55,16 +54,13 @@ PlatformGetProcessorInfo (CONST VOID *Fdt, PLATFORM_PROCESSOR_INFO *Info)
   AsciiStrCpyS (Info->Manufacturer, sizeof (Info->Manufacturer), "T-Head");
   AsciiSPrint (Info->Name, sizeof (Info->Name),
                "A210 (%u x C920v2 + %u x C908)", C920, C908);
-  Status = MapMmioMemory (A210_CPU_CLOCK_BASE, SIZE_8KB, EFI_MEMORY_UC);
-  if (EFI_ERROR (Status))
-    return Status;
   Hob = GetFirstGuidHob (&SecGuid);
   if (Hob != NULL
       && GET_GUID_HOB_DATA_SIZE (Hob) >= sizeof (RISCV_SEC_HANDOFF_DATA))
   {
     CONST RISCV_SEC_HANDOFF_DATA *Sec = GET_GUID_HOB_DATA (Hob);
-    Info->CurrentMhz
-        = (UINT16)DivU64x32 (A210CpuClock (Sec->BootHartId), 1000000);
+    if (!EFI_ERROR (A210ScmiCpuRate (Fdt, Sec->BootHartId, &Rate)))
+      Info->CurrentMhz = (UINT16)DivU64x32 (Rate, 1000000);
   }
   return EFI_SUCCESS;
 }
