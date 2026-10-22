@@ -9,7 +9,9 @@ contents unchanged.
 `MelonPiPkg` selects the board profile. `A210Pkg` contains the SoC MMIO
 resources and eMMC integration. `RiscVPlatformPkg` provides the shared
 FDT-based SEC entry, boot manager and openRuyi startup graphics.
-The upstream EDK2 tree remains unchanged.
+The upstream ArmScmiDxe supplies the standard Base, Clock and Performance
+protocols through the A210 MTL library. Its INF needs the accompanying
+architecture-neutral library dependency fix.
 
 The EDK2 FD is linked at `0x88000000`. SEC temporary memory occupies
 `0x84000000..0x85ffffff`, separately from coreboot, its FDT, and the
@@ -38,20 +40,18 @@ the V2 firmware and DTB. The `melonpi` build name remains available for
 existing build scripts. Selecting a build
 name does not convert an incompatible DTB into the correct board.
 
-From the parent `th1520` directory, package it with the A210 OpenSBI
-ELF and the board DTB. First build `zhihe/a210-melonpi-v2.dtb` in the
-target kernel and copy it to `build/a210-port/a210-melonpi-v2.dtb`:
-
-Set `MELONPI_OPENSBI` to the path of `fw_dynamic.elf`.
+From the parent workspace, package it with the A210 OpenSBI ELF, the
+Zephyr SCMI image and the board DTB built from the matching Linux tree.
+Set `MELONPI_OPENSBI`, `MELONPI_SCMI` and `MELONPI_DTB` to those files.
 
 ```sh
 python3 coreboot/util/zhihe/build-firmware.py \
   --board melonpi-v2 \
   --boot-medium ram \
-  --aon build/a210-port/aon/a210-aon.bin \
+  --scmi "$MELONPI_SCMI" \
   --opensbi "$MELONPI_OPENSBI" \
-  --edk2-fd th1520-edk2/build/melonpi-v2/A210.fd \
-  --dtb build/a210-port/a210-melonpi-v2.dtb \
+  --edk2-fd edk2-platforms/build/melonpi-v2/A210.fd \
+  --dtb "$MELONPI_DTB" \
   --output build/a210-port/melonpi-v2-edk2-ram
 ```
 
@@ -88,9 +88,18 @@ eMMC, Ethernet and HDMI use shared drivers. V1 has passed coreboot/EDK2
 boot, Fastboot, NVMe and USB tests. The V2 results were obtained on
 the minor revision previously called V3.
 
-Coreboot starts AON and uses its voltage RPCs before configuring both
-CPU clusters at 1.896 GHz. Linux must attach to the running AON without
-reloading it. A working cooling fan or heatsink is required.
+Coreboot prepares the CPU supplies and 1.896 GHz clocks before starting
+Zephyr on E902. EDK2 obtains SoC clocks, resets and power domains through
+SCMI; controller-local registers and PHY analog setup stay with their
+drivers. GPIO and AON I2C1 resource preparation completes before their
+ExitBootServices callbacks. The transport uses only the first (tx) SCMI
+channel and leaves E902, that free channel and the notification channel
+intact for Linux. A working cooling fan or heatsink is required.
+
+The SCMI migration passes cross-builds and host tests. A debugger-assisted
+RAM run reached Fastboot and launched a kernel, but full runtime and reset
+validation remain pending. The hardware measurements elsewhere on this
+page describe the earlier vendor-AON boot chain.
 
 ## RAM download
 
@@ -120,11 +129,12 @@ The A210 host integrates the upstream SDHCI and eMMC drivers through
 `EDKII_SD_MMC_OVERRIDE_PROTOCOL` and the non-discoverable device
 protocol. This PCI I/O abstraction does not imply a physical PCI bus.
 The DTB supplies the controller address, bus width and frequency limit.
-The input clock is decoded from the running PLL and divider registers.
+The storage power domain and clocks are requested through SCMI. The
+input clock rate is queried from the firmware provider.
 
-The current mode is 8-bit high-speed SDR with PIO, at approximately
-50.77 MHz on the tested BootROM clock configuration. HS200, HS400 and
-DMA are not enabled. The peripheral PLL configuration is preserved.
+The current mode is 8-bit high-speed SDR with PIO. The driver computes
+the card-clock divider from the SCMI input rate; the earlier boot chain
+used approximately 50.77 MHz. HS200, HS400 and DMA are not enabled.
 
 Two controller clock steps are required after the standard driver's
 setup: restore SDCLK after card power switching, and set the SDHCI
@@ -278,10 +288,10 @@ coreboot DDR training; it does not assume that every board has 8 GiB.
 The current board reports `Melon Pi`, `4 x C920v2 + 4 x C908`, and
 `8192 MB RAM`. E902 is a management core, not a UEFI application hart.
 
-The frequency shown is the boot hart's current clock, read from the
-CPU PLL, clock mux and CCU divider. With the current coreboot image,
-Setup shows 1.89 GHz for the 1.896 GHz C908 clock. Reporting the clock
-does not change the voltage or frequency.
+SMBIOS obtains the boot hart's frequency from its DT performance domain
+through the standard SCMI Performance protocol. The value is unknown if
+no performance domain is described. This query does not change voltage
+or frequency.
 
 The standard platform boot-manager protocol excludes physical eMMC
 boot0 and boot1 areas from automatically generated boot options. It
@@ -346,8 +356,8 @@ Type-C orientation or role switching.
 
 The firmware exposes both DT-enabled A210 DWMAC 5.40a controllers as
 SNP interfaces. Controller addresses, PHY addresses, RGMII delay mode
-and pad groups come from the DTB. A210 clock/reset and pin configuration
-live in `EqosPlatformLib`; the common `DwMac4Dxe` driver owns descriptors,
+and pad groups come from the DTB. `EqosPlatformLib` requests clocks and
+resets through SCMI and configures pins; the common `DwMac4Dxe` owns descriptors,
 SNP and RTL8211 PHY access. TH1520 keeps its DWMAC 3.70a driver.
 
 Coreboot must initialize the PERI1 IOPMP entries before entering EDK2.
@@ -408,9 +418,8 @@ The DTB must include the DC8200, HDMI, VO clock and connector graph, plus
 GPIO2_25/30/31 in HDMI mode. The board DTS keeps the carrier enable GPIOs
 claimed across OS handoff.
 
-DPU1 PLL is already 1188 MHz after BootROM initialization. Firmware
-changes only the channel divider and HDMI input mux, without retuning
-that PLL. The capture card selected 1920x1080 at 148.5 MHz. Both UEFI
+The display library requests the pixel rate through SCMI, leaving the
+channel divider and parent selection to Zephyr. The capture card selected 1920x1080 at 148.5 MHz. Both UEFI
 Shell and F2 setup were captured after a complete boot0 restart, with
 serial output still available. The console retains its 80x25 layout.
 
